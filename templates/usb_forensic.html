@@ -1,0 +1,335 @@
+{% extends "app_base.html" %}
+{% block title %}USB Forensic - NexTrace{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex items-center justify-between">
+    <div>
+        <div class="flex items-center gap-3 text-sm text-gray-500 mb-2">
+            <a href="{{ url_for('dashboard') }}" class="hover:text-brand transition-colors flex items-center gap-1">
+                <i data-feather="arrow-left" class="w-4 h-4"></i> Dashboard
+            </a>
+            <i data-feather="chevron-right" class="w-4 h-4"></i>
+            <span class="text-gray-900 font-medium">USB Forensic</span>
+        </div>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center text-brand">
+                <i data-feather="hard-drive" class="w-5 h-5"></i>
+            </div>
+            USB Forensic Analysis
+        </h1>
+        <p class="text-gray-500">Analyze connected USB devices from a Windows SYSTEM registry hive and correlate with Event Logs.</p>
+    </div>
+    {% if results %}
+    <div>
+        <a href="{{ url_for('generate_usb_report', hive_name=hive_name) }}" target="_blank" class="px-4 py-2 bg-brand text-white rounded-lg text-sm font-medium hover:bg-brand-hover transition-colors inline-flex items-center gap-2 shadow-sm">
+            <i data-feather="download" class="w-4 h-4"></i> Generate PDF Report
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Upload Section -->
+<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
+    <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <i data-feather="upload-cloud" class="w-5 h-5 text-gray-400"></i> Upload Artifacts
+    </h2>
+    <form action="{{ url_for('usb_forensic') }}" method="POST" enctype="multipart/form-data" id="uploadForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- SYSTEM Hive Upload -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <label class="block text-sm font-medium text-gray-700">SYSTEM Registry Hive (Required) *</label>
+                    <button type="button" onclick="document.getElementById('hiveHelp').classList.toggle('hidden')" class="text-xs text-brand hover:text-brand-hover flex items-center gap-1 font-medium transition-colors">
+                        <i data-feather="help-circle" class="w-3.5 h-3.5"></i> How do I get this file?
+                    </button>
+                </div>
+                
+                <!-- Collapsible Help Guide -->
+                <div id="hiveHelp" class="hidden mb-4 p-4 bg-brand/5 border border-brand/20 rounded-lg text-sm text-gray-700">
+                    <h4 class="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                        <i data-feather="info" class="w-4 h-4 text-brand"></i> How to Export Your SYSTEM Hive File
+                    </h4>
+                    <ol class="list-decimal list-inside space-y-2 mb-3">
+                        <li>Open PowerShell as Administrator (right-click the Start menu or PowerShell icon and select "Run as Administrator")</li>
+                        <li>Run this command:</li>
+                        <div class="relative mt-1 mb-2">
+                            <pre class="bg-gray-900 text-gray-100 p-3 rounded-md overflow-x-auto text-xs font-mono"><code>reg save HKLM\SYSTEM C:\Users\%USERNAME%\system_test.hive</code></pre>
+                            <button type="button" onclick="navigator.clipboard.writeText('reg save HKLM\\SYSTEM C:\\Users\\%USERNAME%\\system_test.hive'); this.textContent = 'Copied!';" class="absolute top-2 right-2 text-gray-400 hover:text-white transition-colors bg-gray-800 hover:bg-gray-700 rounded px-2 py-1 flex items-center gap-1 text-xs">
+                                <i data-feather="copy" class="w-3.5 h-3.5"></i> Copy
+                            </button>
+                        </div>
+                        <li>This creates a file at C:\Users\&lt;YourName&gt;\system_test.hive - open File Explorer, go to that location, and upload the file here.</li>
+                    </ol>
+                    <p class="text-xs text-gray-500 italic bg-white p-2 rounded border border-gray-100 mb-2">
+                        <i data-feather="info" class="w-3 h-3 inline mr-1"></i> Replace &lt;YourName&gt; with your actual Windows username, or just navigate to your Users folder in File Explorer to find it.
+                    </p>
+                    <p class="text-xs text-gray-500 italic bg-white p-2 rounded border border-gray-100">
+                        <i data-feather="alert-circle" class="w-3 h-3 inline mr-1"></i> Administrator access is required to export this file. This only reads a copy of the registry and does not modify your system.
+                    </p>
+                </div>
+
+                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-brand/50 transition-colors bg-gray-50">
+                    <div class="space-y-1 text-center">
+                        <i data-feather="database" class="mx-auto h-8 w-8 text-gray-400"></i>
+                        <div class="flex text-sm text-gray-600 justify-center">
+                            <label for="system_hive" class="relative cursor-pointer bg-transparent rounded-md font-medium text-brand hover:text-brand-hover focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-brand">
+                                <span>Upload a hive</span>
+                                <input id="system_hive" name="system_hive" type="file" class="sr-only" required>
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500" id="system_hive_name">No file selected</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Event Log Upload -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Windows Event Log (.evtx) (Optional)</label>
+                <p class="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                    <i data-feather="info" class="w-3.5 h-3.5"></i> Found in Event Viewer &gt; Windows Logs &gt; System, right-click &gt; Save All Events As
+                </p>
+                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-brand/50 transition-colors bg-gray-50">
+                    <div class="space-y-1 text-center">
+                        <i data-feather="file-text" class="mx-auto h-8 w-8 text-gray-400"></i>
+                        <div class="flex text-sm text-gray-600 justify-center">
+                            <label for="event_log" class="relative cursor-pointer bg-transparent rounded-md font-medium text-brand hover:text-brand-hover focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-brand">
+                                <span>Upload .evtx</span>
+                                <input id="event_log" name="event_log" type="file" class="sr-only">
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500" id="event_log_name">No file selected</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit" id="analyzeBtn" class="bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 px-6 rounded-lg transition-colors flex items-center gap-2">
+                <span>Run Analysis</span>
+                <i data-feather="play" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Results Section -->
+{% if results %}
+<div class="space-y-8 animate-fade-in">
+
+    <!-- 1. USB Devices Detected -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg leading-6 font-bold text-gray-900 flex items-center gap-2">
+                <i data-feather="list" class="w-5 h-5 text-gray-400"></i> USB Devices Detected
+            </h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-white">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Device</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Vendor / Product</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Serial Number</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Write Time</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for device in results.devices %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">{{ device.friendly_name or 'Unknown Device' }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ device.vendor }}</div>
+                            <div class="text-xs text-gray-500">{{ device.product }} Rev {{ device.revision }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{{ device.serial_number }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ device.last_write_time.strftime('%Y-%m-%d %H:%M:%S UTC') if device.last_write_time else 'N/A' }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500">No USB devices found in this hive.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 2. Connection Timeline -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg leading-6 font-bold text-gray-900 flex items-center gap-2">
+                <i data-feather="clock" class="w-5 h-5 text-gray-400"></i> Connection Timeline (Registry Last Write)
+            </h3>
+        </div>
+        <div class="p-6">
+            {% set sorted_devices = results.devices|selectattr('last_write_time')|sort(attribute='last_write_time', reverse=true) %}
+            {% if sorted_devices %}
+            <div class="relative border-l-2 border-brand/30 ml-3 space-y-6">
+                {% for device in sorted_devices %}
+                <div class="relative pl-6">
+                    <div class="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-brand border-2 border-white shadow-sm"></div>
+                    <div class="text-sm font-bold text-gray-900">{{ device.last_write_time.strftime('%Y-%m-%d %H:%M:%S UTC') }}</div>
+                    <div class="text-sm text-gray-600 mt-1">
+                        <span class="font-medium">{{ device.vendor }} {{ device.product }}</span> 
+                        <span class="text-gray-400 font-mono ml-2 text-xs">(SN: {{ device.serial_number }})</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center text-sm text-gray-500 py-4">No valid timeline data available.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 3. Risk Analysis -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg leading-6 font-bold text-gray-900 flex items-center gap-2">
+                <i data-feather="alert-triangle" class="w-5 h-5 text-gray-400"></i> Risk Analysis
+            </h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-white">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Device</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Flag Reason</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Risk Level</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for risk in results.risks %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">{{ risk.device_name }}</div>
+                            <div class="text-xs text-gray-500 font-mono">{{ risk.serial_number }}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-900">{{ risk.reason }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if risk.level == 'High' %}bg-red-100 text-red-800
+                                {% elif risk.level == 'Medium' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-green-100 text-green-800{% endif %}">
+                                {{ risk.level }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="px-6 py-8 text-center text-sm text-gray-500">No anomalies detected.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 4. Event Log Correlation -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg leading-6 font-bold text-gray-900 flex items-center gap-2">
+                <i data-feather="activity" class="w-5 h-5 text-gray-400"></i> Event Log Correlation
+            </h3>
+        </div>
+        {% if results.events %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-white">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Timestamp</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Event ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Matched Device (by SN)</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for event in results.events %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ event.timestamp }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <span class="px-2 py-1 bg-gray-100 rounded text-xs font-mono border border-gray-200">{{ event.event_id }}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-brand">{{ event.matched_device }}</div>
+                            <div class="text-xs text-gray-500 font-mono">{{ event.serial_number }}</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-8 text-center">
+            <p class="text-sm text-gray-500">No event log uploaded or no matching USB connection events found.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 5. Multi-Machine Matching -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg leading-6 font-bold text-gray-900 flex items-center gap-2">
+                <i data-feather="link" class="w-5 h-5 text-gray-400"></i> Multi-Machine Matches
+            </h3>
+        </div>
+        <div class="p-6">
+            {% if results.matches %}
+            <div class="grid gap-4">
+                {% for match in results.matches %}
+                <div class="p-4 rounded-lg bg-yellow-50 border border-yellow-200 flex items-start gap-3">
+                    <i data-feather="info" class="w-5 h-5 text-yellow-600 mt-0.5"></i>
+                    <div>
+                        <p class="text-sm text-yellow-900">
+                            <strong>{{ match.device_name }}</strong> (SN: <span class="font-mono">{{ match.serial_number }}</span>) 
+                            was also seen in previously analyzed hive: <strong>{{ match.other_hive }}</strong>
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500 text-center">No devices in this hive have been seen in previously analyzed hives.</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('system_hive').addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            document.getElementById('system_hive_name').textContent = e.target.files[0].name;
+            document.getElementById('system_hive_name').classList.add('text-brand', 'font-medium');
+        }
+    });
+    
+    document.getElementById('event_log').addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            document.getElementById('event_log_name').textContent = e.target.files[0].name;
+            document.getElementById('event_log_name').classList.add('text-brand', 'font-medium');
+        }
+    });
+
+    document.getElementById('uploadForm').addEventListener('submit', function() {
+        const btn = document.getElementById('analyzeBtn');
+        btn.innerHTML = `<span>Analyzing...</span><svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+        btn.disabled = true;
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+    });
+</script>
+<style>
+    .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+{% endblock %}

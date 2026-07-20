@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}USB Forensic Dashboard{% endblock %}</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            DEFAULT: '#1a7a4c',
+                            hover: '#135c39'
+                        },
+                        background: '#f3f4f6'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    </style>
+</head>
+<body class="bg-background font-sans text-gray-800 antialiased min-h-screen flex flex-col items-center justify-center py-10 px-4">
+    
+    <div class="w-full max-w-[420px]">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="mb-4 space-y-2">
+                    {% for category, message in messages %}
+                        <div class="p-3 rounded-lg text-sm shadow-sm transition-opacity {% if category == 'error' %}bg-red-50 text-red-600 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Minimal icons (Feather icons) -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script>
+      feather.replace()
+    </script>
+</body>
+</html>

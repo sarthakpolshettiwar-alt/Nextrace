@@ -1,0 +1,7 @@
+.env
+*.hive
+*.evtx
+usb_forensics.db
+__pycache__/
+venv/
+.venv/

@@ -1,0 +1,30 @@
+{% extends "app_base.html" %}
+{% block title %}Email Forensic - NexTrace{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex items-center justify-between">
+    <div>
+        <div class="flex items-center gap-3 text-sm text-gray-500 mb-2">
+            <a href="{{ url_for('dashboard') }}" class="hover:text-brand transition-colors flex items-center gap-1">
+                <i data-feather="arrow-left" class="w-4 h-4"></i> Dashboard
+            </a>
+            <i data-feather="chevron-right" class="w-4 h-4"></i>
+            <span class="text-gray-900 font-medium">Email Forensic</span>
+        </div>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center text-brand">
+                <i data-feather="mail" class="w-5 h-5"></i>
+            </div>
+            Email Forensic Analysis
+        </h1>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
+    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand/10 text-brand mb-4">
+        <i data-feather="tool" class="w-8 h-8"></i>
+    </div>
+    <h2 class="text-xl font-bold text-gray-900 mb-2">This module is under development</h2>
+    <p class="text-gray-500 max-w-md mx-auto">We are actively building the Email Forensic Analysis tools. Check back soon for updates.</p>
+</div>
+{% endblock %}

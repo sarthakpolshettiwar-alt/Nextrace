@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Activity Log - USB Forensic Dashboard{% endblock %}
+
+{% block content %}
+<!-- Allow Activity log to expand beyond 420px max-width using negative margins or a larger container if needed. For simplicity we override max-width locally -->
+<style>
+    .max-w-\[420px\] { max-width: 800px !important; }
+</style>
+
+<div class="bg-white rounded-2xl shadow-lg p-6 w-full border border-gray-100">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-xl font-bold text-gray-900">Authentication Activity Log</h1>
+        <a href="{{ url_for('dashboard') }}" class="text-brand hover:text-brand-hover text-sm font-medium">Back to Dashboard</a>
+    </div>
+
+    <!-- Search Form -->
+    <form method="GET" action="{{ url_for('auth.activity_log') }}" class="mb-6 flex gap-2">
+        <input type="text" name="search" value="{{ search }}" placeholder="Filter by email..." 
+               class="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none text-sm">
+        <button type="submit" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-gray-200">
+            Search
+        </button>
+        {% if search %}
+        <a href="{{ url_for('auth.activity_log') }}" class="bg-white text-gray-500 hover:text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 flex items-center">
+            Clear
+        </a>
+        {% endif %}
+    </form>
+
+    <div class="overflow-x-auto rounded-lg border border-gray-200">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for record in records %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ record.timestamp }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ record.email }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        {% if record.success %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Success
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                Failed
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{{ record.method }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ record.ip_address }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">
+                        No activity records found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="mt-6 flex justify-between items-center">
+        <div class="text-sm text-gray-500">
+            Page <span class="font-medium">{{ page }}</span> of <span class="font-medium">{{ total_pages }}</span>
+        </div>
+        <div class="flex gap-2">
+            {% if page > 1 %}
+                <a href="{{ url_for('auth.activity_log', page=page-1, search=search) }}" class="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Previous</a>
+            {% else %}
+                <button disabled class="px-3 py-1 border border-gray-200 rounded-md text-sm font-medium text-gray-400 bg-gray-50 cursor-not-allowed">Previous</button>
+            {% endif %}
+            
+            {% if page < total_pages %}
+                <a href="{{ url_for('auth.activity_log', page=page+1, search=search) }}" class="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Next</a>
+            {% else %}
+                <button disabled class="px-3 py-1 border border-gray-200 rounded-md text-sm font-medium text-gray-400 bg-gray-50 cursor-not-allowed">Next</button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
