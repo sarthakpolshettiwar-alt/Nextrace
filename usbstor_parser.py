@@ -50,6 +50,19 @@ def parse_usbstor_output(raw_output: str) -> List[UsbDevice]:
         
         if line_stripped.startswith("S/N:"):
             sn_raw = line_stripped[4:].strip()
+            
+            # Check for timestamp in brackets (e.g. [2026-04-15 13:46:43Z])
+            ts_match = re.search(r'\[(.*?)\]', sn_raw)
+            if ts_match:
+                ts_str = ts_match.group(1)
+                try:
+                    dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%SZ")
+                    current_device['last_write_time'] = dt
+                except ValueError:
+                    pass
+                # Remove the timestamp part from the sn_raw
+                sn_raw = sn_raw.replace(f'[{ts_str}]', '').strip()
+
             # Strip trailing "&0" if present
             if sn_raw.endswith("&0"):
                 sn_raw = sn_raw[:-2]

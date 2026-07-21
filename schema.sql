@@ -4,10 +4,11 @@ CREATE TABLE IF NOT EXISTS USB_Device (
     vendor TEXT,
     product TEXT,
     revision TEXT,
-    serial_number TEXT UNIQUE NOT NULL,
+    serial_number TEXT NOT NULL,
     friendly_name TEXT,
     parent_id_prefix TEXT,
-    last_write_time DATETIME
+    last_write_time DATETIME,
+    UNIQUE(serial_number, source_hive)
 );
 
 CREATE TABLE IF NOT EXISTS User (

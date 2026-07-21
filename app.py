@@ -1,5 +1,5 @@
 import os
-from datetime import timedelta
+from datetime import timedelta, timezone
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, session
 from flask_login import LoginManager, login_required, current_user
 from flask_wtf.csrf import CSRFProtect
@@ -98,43 +98,52 @@ def usb_forensic():
         hive_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_hive_id)
         hive_file.save(hive_path)
         
-        # Handle optional EVTX
-        evtx_path = None
-        if 'event_log' in request.files and request.files['event_log'].filename != '':
-            evtx_file = request.files['event_log']
-            evtx_filename = secure_filename(evtx_file.filename)
-            evtx_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{uuid.uuid4().hex[:8]}_{evtx_filename}")
-            evtx_file.save(evtx_path)
+        # Handle optional EVTX logs
+        evtx_paths = []
+        for log_field in ['config_log', 'management_log']:
+            if log_field in request.files and request.files[log_field].filename != '':
+                evtx_file = request.files[log_field]
+                evtx_filename = secure_filename(evtx_file.filename)
+                evtx_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{uuid.uuid4().hex[:8]}_{evtx_filename}")
+                evtx_file.save(evtx_path)
+                evtx_paths.append(evtx_path)
+                
+                # DEBUG LOGGING
+                print(f"[DEBUG] Received {log_field}: {evtx_file.filename} -> saved as {evtx_filename}")
+                print(f"[DEBUG] File size: {os.path.getsize(evtx_path)} bytes")
+            
+        upload_id = request.form.get('upload_id')
             
         try:
             # 1. Parse Hive
             raw_output = run_regripper(hive_path, 'usbstor')
             devices = parse_usbstor_output(raw_output)
             
-            # Save to Database
-            insert_usb_devices(devices, source_hive=hive_filename)
-            
-            # 2. Risk Analysis
-            risks = analyze_risk(devices)
-            
             # 3. Event Correlation
             events = []
-            if evtx_path:
-                parsed_events = parse_usb_events(evtx_path)
+            if evtx_paths:
+                parsed_events = []
+                for ep in evtx_paths:
+                    print(f"[DEBUG] Passing EVTX to parse_usb_events: {ep}")
+                    parsed_events.extend(parse_usb_events(ep, upload_id=upload_id))
+                print(f"[DEBUG] parse_usb_events returned {len(parsed_events)} events total")
                 events = correlate_events_with_devices(parsed_events, devices)
+                print(f"[DEBUG] correlate_events_with_devices returned {len(events)} correlated events")
                 
-            # 4. Multi-Machine Matching
-            all_db_devices = get_all_devices()
-            matches = []
-            current_serials = [d.serial_number for d in devices if d.serial_number]
-            for db_dev in all_db_devices:
-                if db_dev['source_hive'] != hive_filename and db_dev['serial_number'] in current_serials:
-                    matches.append({
-                        'device_name': db_dev['friendly_name'] or f"{db_dev['vendor']} {db_dev['product']}",
-                        'serial_number': db_dev['serial_number'],
-                        'other_hive': db_dev['source_hive']
-                    })
+            # Save to Database using unique_hive_id for distinguishable sessions
+            insert_usb_devices(devices, source_hive=unique_hive_id)
             
+            # 2. Risk Analysis (now using events)
+            risks = analyze_risk(devices, events)
+                
+            # matches are removed
+            matches = []
+            
+            # Add timedelta for IST conversion directly on the objects for HTML rendering
+            for d in devices:
+                if d.last_write_time:
+                    d.last_write_time = d.last_write_time + timedelta(hours=5, minutes=30)
+
             results = {
                 'devices': devices,
                 'risks': risks,
@@ -144,10 +153,21 @@ def usb_forensic():
             
             # Save results in session so they can be picked up by the PDF generator
             # Need to serialize devices manually as they are dataclass objects
+            serialized_devices = []
+            for d in devices:
+                lw_time_str = None
+                if d.last_write_time:
+                    # Time is already converted to IST from earlier
+                    lw_time_str = d.last_write_time.isoformat()
+                
+                serialized_devices.append({
+                    'vendor': d.vendor, 'product': d.product, 'revision': d.revision, 
+                    'serial_number': d.serial_number, 'friendly_name': d.friendly_name, 
+                    'last_write_time': lw_time_str
+                })
+                
             serialized_results = {
-                'devices': [{'vendor': d.vendor, 'product': d.product, 'revision': d.revision, 
-                             'serial_number': d.serial_number, 'friendly_name': d.friendly_name, 
-                             'last_write_time': d.last_write_time.isoformat() if d.last_write_time else None} for d in devices],
+                'devices': serialized_devices,
                 'risks': risks,
                 'events': events,
                 'matches': matches
@@ -160,6 +180,8 @@ def usb_forensic():
                 
             hive_name = unique_hive_id
             
+        except TimeoutError as e:
+            flash(str(e), 'error')
         except Exception as e:
             flash(f'Error analyzing files: {str(e)}', 'error')
             
@@ -167,10 +189,24 @@ def usb_forensic():
             # Clean up uploaded files
             if os.path.exists(hive_path):
                 os.remove(hive_path)
-            if evtx_path and os.path.exists(evtx_path):
-                os.remove(evtx_path)
+            for ep in evtx_paths:
+                if os.path.exists(ep):
+                    os.remove(ep)
                 
     return render_template('usb_forensic.html', results=results, hive_name=hive_name)
+
+@app.route('/progress/<upload_id>')
+@login_required
+def get_progress(upload_id):
+    prog_file = os.path.join(app.config['UPLOAD_FOLDER'], f'{secure_filename(upload_id)}_progress.json')
+    if os.path.exists(prog_file):
+        try:
+            with open(prog_file, 'r') as f:
+                data = json.load(f)
+                return data
+        except Exception:
+            pass
+    return {'status': 'Analyzing...'}
 
 @app.route('/usb-forensic/report/<hive_name>')
 @login_required

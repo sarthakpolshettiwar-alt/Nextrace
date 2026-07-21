@@ -35,7 +35,8 @@
     </h2>
     <form action="{{ url_for('usb_forensic') }}" method="POST" enctype="multipart/form-data" id="uploadForm">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <input type="hidden" name="upload_id" id="upload_id" value=""/>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <!-- SYSTEM Hive Upload -->
             <div>
                 <div class="flex items-center justify-between mb-2">
@@ -83,22 +84,84 @@
                 </div>
             </div>
 
-            <!-- Event Log Upload -->
+            <!-- Config Log Upload -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Windows Event Log (.evtx) (Optional)</label>
+                <div class="flex items-center justify-between mb-2">
+                    <label class="block text-sm font-medium text-gray-700">Device Configuration Log (.evtx)</label>
+                    <button type="button" onclick="document.getElementById('configHelp').classList.toggle('hidden')" class="text-xs text-brand hover:text-brand-hover flex items-center gap-1 font-medium transition-colors">
+                        <i data-feather="help-circle" class="w-3.5 h-3.5"></i> How do I get this file?
+                    </button>
+                </div>
+                
+                <!-- Collapsible Help Guide -->
+                <div id="configHelp" class="hidden mb-4 p-4 bg-brand/5 border border-brand/20 rounded-lg text-sm text-gray-700">
+                    <h4 class="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                        <i data-feather="info" class="w-4 h-4 text-brand"></i> How to Export the Device Configuration Log
+                    </h4>
+                    <ol class="list-decimal list-inside space-y-2 mb-3">
+                        <li>Press Win+R, type <code class="font-mono text-xs">eventvwr.msc</code>, press Enter</li>
+                        <li>In the left panel, navigate to: <code class="bg-gray-100 px-1 rounded text-xs text-gray-800">Applications and Services Logs &gt; Microsoft &gt; Windows &gt; Kernel-PnP &gt; Device Configuration</code></li>
+                        <li>Right-click "Device Configuration" and select "Save All Events As..."</li>
+                        <li>Save the file as <code class="font-mono text-xs">device_config_events.evtx</code> and upload it here</li>
+                    </ol>
+                    <p class="text-xs text-gray-500 italic bg-white p-2 rounded border border-gray-100">
+                        <i data-feather="info" class="w-3 h-3 inline mr-1"></i> This log records device driver installation/configuration events, useful for identifying first-time USB connections.
+                    </p>
+                </div>
                 <p class="text-xs text-gray-500 mb-2 flex items-center gap-1">
-                    <i data-feather="info" class="w-3.5 h-3.5"></i> Found in Event Viewer &gt; Windows Logs &gt; System, right-click &gt; Save All Events As
+                    <i data-feather="info" class="w-3.5 h-3.5"></i> Kernel-PnP (IDs 400-430)
                 </p>
                 <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-brand/50 transition-colors bg-gray-50">
                     <div class="space-y-1 text-center">
                         <i data-feather="file-text" class="mx-auto h-8 w-8 text-gray-400"></i>
                         <div class="flex text-sm text-gray-600 justify-center">
-                            <label for="event_log" class="relative cursor-pointer bg-transparent rounded-md font-medium text-brand hover:text-brand-hover focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-brand">
-                                <span>Upload .evtx</span>
-                                <input id="event_log" name="event_log" type="file" class="sr-only">
+                            <label for="config_log" class="relative cursor-pointer bg-transparent rounded-md font-medium text-brand hover:text-brand-hover focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-brand">
+                                <span>Upload Config</span>
+                                <input id="config_log" name="config_log" type="file" class="sr-only">
                             </label>
                         </div>
-                        <p class="text-xs text-gray-500" id="event_log_name">No file selected</p>
+                        <p class="text-xs text-gray-500" id="config_log_name">No file selected</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Management Log Upload -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <label class="block text-sm font-medium text-gray-700">Device Management Log (.evtx)</label>
+                    <button type="button" onclick="document.getElementById('managementHelp').classList.toggle('hidden')" class="text-xs text-brand hover:text-brand-hover flex items-center gap-1 font-medium transition-colors">
+                        <i data-feather="help-circle" class="w-3.5 h-3.5"></i> How do I get this file?
+                    </button>
+                </div>
+                
+                <!-- Collapsible Help Guide -->
+                <div id="managementHelp" class="hidden mb-4 p-4 bg-brand/5 border border-brand/20 rounded-lg text-sm text-gray-700">
+                    <h4 class="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                        <i data-feather="info" class="w-4 h-4 text-brand"></i> How to Export the Device Management Log
+                    </h4>
+                    <ol class="list-decimal list-inside space-y-2 mb-3">
+                        <li>Press Win+R, type <code class="font-mono text-xs">eventvwr.msc</code>, press Enter</li>
+                        <li>In the left panel, navigate to: <code class="bg-gray-100 px-1 rounded text-xs text-gray-800">Applications and Services Logs &gt; Microsoft &gt; Windows &gt; Kernel-PnP &gt; Device Management</code></li>
+                        <li>Right-click "Device Management" and select "Save All Events As..."</li>
+                        <li>Save the file as <code class="font-mono text-xs">device_management_events.evtx</code> and upload it here</li>
+                    </ol>
+                    <p class="text-xs text-gray-500 italic bg-white p-2 rounded border border-gray-100">
+                        <i data-feather="info" class="w-3 h-3 inline mr-1"></i> This log reliably records every USB connect/disconnect event, including repeated connections of the same device - use this for accurate real-time timeline data.
+                    </p>
+                </div>
+                <p class="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                    <i data-feather="info" class="w-3.5 h-3.5"></i> Kernel-PnP (ID 1010)
+                </p>
+                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-brand/50 transition-colors bg-gray-50">
+                    <div class="space-y-1 text-center">
+                        <i data-feather="file-text" class="mx-auto h-8 w-8 text-gray-400"></i>
+                        <div class="flex text-sm text-gray-600 justify-center">
+                            <label for="management_log" class="relative cursor-pointer bg-transparent rounded-md font-medium text-brand hover:text-brand-hover focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-brand">
+                                <span>Upload Management</span>
+                                <input id="management_log" name="management_log" type="file" class="sr-only">
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500" id="management_log_name">No file selected</p>
                     </div>
                 </div>
             </div>
@@ -118,7 +181,11 @@
 <div class="space-y-8 animate-fade-in">
 
     <!-- 1. USB Devices Detected -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+        <div class="px-6 py-4 border-b border-gray-200 bg-blue-50/50 flex gap-2 text-sm text-blue-800 italic">
+            <i data-feather="info" class="w-4 h-4 mt-0.5 shrink-0"></i>
+            <p>Registry 'Last Write Time' reflects only the first/last registered connection in the registry. Upload both Device Configuration and Device Management event logs for accurate real-time connect/disconnect history.</p>
+        </div>
         <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
             <h3 class="text-lg leading-6 font-bold text-gray-900 flex items-center gap-2">
                 <i data-feather="list" class="w-5 h-5 text-gray-400"></i> USB Devices Detected
@@ -137,16 +204,16 @@
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for device in results.devices %}
                     <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">{{ device.friendly_name or 'Unknown Device' }}</div>
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-medium text-gray-900 max-w-[200px] break-words">{{ device.friendly_name or 'Unknown Device' }}</div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ device.vendor }}</div>
-                            <div class="text-xs text-gray-500">{{ device.product }} Rev {{ device.revision }}</div>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-900 max-w-[200px] break-words">{{ device.vendor }}</div>
+                            <div class="text-xs text-gray-500 max-w-[200px] break-words">{{ device.product }} Rev {{ device.revision }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{{ device.serial_number }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {{ device.last_write_time.strftime('%Y-%m-%d %H:%M:%S UTC') if device.last_write_time else 'N/A' }}
+                            {{ device.last_write_time.strftime('%Y-%m-%d %H:%M:%S IST') if device.last_write_time else 'N/A' }}
                         </td>
                     </tr>
                     {% else %}
@@ -157,32 +224,66 @@
                 </tbody>
             </table>
         </div>
+        <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <p class="text-xs text-gray-500 italic flex items-center gap-2">
+                <i data-feather="info" class="w-3.5 h-3.5"></i>
+                Note: Windows does not always update this registry timestamp on routine reconnects - refer to the Connection Timeline below for actual connect/disconnect activity.
+            </p>
+        </div>
     </div>
 
     <!-- 2. Connection Timeline -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
             <h3 class="text-lg leading-6 font-bold text-gray-900 flex items-center gap-2">
-                <i data-feather="clock" class="w-5 h-5 text-gray-400"></i> Connection Timeline (Registry Last Write)
+                <i data-feather="clock" class="w-5 h-5 text-gray-400"></i> Connection Timeline
             </h3>
         </div>
         <div class="p-6">
+            {% if results.events %}
+            <p class="text-sm text-gray-500 mb-6 italic">Correlated with Microsoft-Windows-Kernel-PnP Device Configuration and Device Management event logs.</p>
+            <div class="relative border-l-2 border-brand/30 ml-3 space-y-6">
+                {% for event in (results.events|sort(attribute='timestamp', reverse=true))[:10] %}
+                <div class="relative pl-6">
+                    <div class="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-brand border-2 border-white shadow-sm"></div>
+                    <div class="text-sm font-bold text-gray-900">{{ event.timestamp }}</div>
+                    <div class="text-sm text-gray-600 mt-1">
+                        <span class="font-medium">{{ event.matched_device }}</span> 
+                        <span class="text-gray-400 font-mono ml-2 text-xs">(SN: {{ event.serial_number }})</span>
+                    </div>
+                    <div class="text-xs font-semibold mt-1 {% if event.event_id in ['400', '410', '420', '430'] %}text-green-600{% elif event.event_id == '1010' %}text-red-600{% else %}text-gray-500{% endif %}">
+                        {% if event.event_id in ['400', '410', '420', '430'] %} Connected (ID: {{ event.event_id }})
+                        {% elif event.event_id == '1010' %} Disconnected (ID: 1010)
+                        {% else %} Event ID {{ event.event_id }} {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            {% if results.events|length > 10 %}
+            <p class="text-xs text-gray-500 mt-4 text-center">Showing 10 most recent events. Full history available in the PDF report.</p>
+            {% endif %}
+            
+            {% else %}
+            <p class="text-sm text-gray-500 mb-6 italic">Showing registry last-write times only. Upload a Windows Event Log for precise connect/disconnect timestamps.</p>
             {% set sorted_devices = results.devices|selectattr('last_write_time')|sort(attribute='last_write_time', reverse=true) %}
             {% if sorted_devices %}
             <div class="relative border-l-2 border-brand/30 ml-3 space-y-6">
                 {% for device in sorted_devices %}
                 <div class="relative pl-6">
                     <div class="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-brand border-2 border-white shadow-sm"></div>
-                    <div class="text-sm font-bold text-gray-900">{{ device.last_write_time.strftime('%Y-%m-%d %H:%M:%S UTC') }}</div>
+                    <div class="text-sm font-bold text-gray-900">{{ device.last_write_time.strftime('%Y-%m-%d %H:%M:%S IST') }}</div>
                     <div class="text-sm text-gray-600 mt-1">
                         <span class="font-medium">{{ device.vendor }} {{ device.product }}</span> 
                         <span class="text-gray-400 font-mono ml-2 text-xs">(SN: {{ device.serial_number }})</span>
                     </div>
+                    <div class="text-xs font-semibold text-gray-500 mt-1">Last Registry Write Time</div>
                 </div>
                 {% endfor %}
             </div>
             {% else %}
             <p class="text-center text-sm text-gray-500 py-4">No valid timeline data available.</p>
+            {% endif %}
             {% endif %}
         </div>
     </div>
@@ -194,7 +295,7 @@
                 <i data-feather="alert-triangle" class="w-5 h-5 text-gray-400"></i> Risk Analysis
             </h3>
         </div>
-        <div class="overflow-x-auto">
+        <div class="p-6 overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-white">
                     <tr>
@@ -272,33 +373,6 @@
         {% endif %}
     </div>
 
-    <!-- 5. Multi-Machine Matching -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
-            <h3 class="text-lg leading-6 font-bold text-gray-900 flex items-center gap-2">
-                <i data-feather="link" class="w-5 h-5 text-gray-400"></i> Multi-Machine Matches
-            </h3>
-        </div>
-        <div class="p-6">
-            {% if results.matches %}
-            <div class="grid gap-4">
-                {% for match in results.matches %}
-                <div class="p-4 rounded-lg bg-yellow-50 border border-yellow-200 flex items-start gap-3">
-                    <i data-feather="info" class="w-5 h-5 text-yellow-600 mt-0.5"></i>
-                    <div>
-                        <p class="text-sm text-yellow-900">
-                            <strong>{{ match.device_name }}</strong> (SN: <span class="font-mono">{{ match.serial_number }}</span>) 
-                            was also seen in previously analyzed hive: <strong>{{ match.other_hive }}</strong>
-                        </p>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-sm text-gray-500 text-center">No devices in this hive have been seen in previously analyzed hives.</p>
-            {% endif %}
-        </div>
-    </div>
 
 </div>
 {% endif %}
@@ -307,6 +381,10 @@
 
 {% block scripts %}
 <script>
+    // Generate UUID for tracking upload progress
+    const uploadId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+    document.getElementById('upload_id').value = uploadId;
+
     document.getElementById('system_hive').addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
             document.getElementById('system_hive_name').textContent = e.target.files[0].name;
@@ -314,18 +392,40 @@
         }
     });
     
-    document.getElementById('event_log').addEventListener('change', function(e) {
+    document.getElementById('config_log').addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
-            document.getElementById('event_log_name').textContent = e.target.files[0].name;
-            document.getElementById('event_log_name').classList.add('text-brand', 'font-medium');
+            document.getElementById('config_log_name').textContent = e.target.files[0].name;
+            document.getElementById('config_log_name').classList.add('text-brand', 'font-medium');
+        }
+    });
+
+    document.getElementById('management_log').addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            document.getElementById('management_log_name').textContent = e.target.files[0].name;
+            document.getElementById('management_log_name').classList.add('text-brand', 'font-medium');
         }
     });
 
     document.getElementById('uploadForm').addEventListener('submit', function() {
         const btn = document.getElementById('analyzeBtn');
-        btn.innerHTML = `<span>Analyzing...</span><svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+        btn.innerHTML = `<span id="btnText">Analyzing...</span><svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
         btn.disabled = true;
         btn.classList.add('opacity-75', 'cursor-not-allowed');
+        
+        // Start polling progress if an EVTX file is attached
+        if (document.getElementById('config_log').files.length > 0 || document.getElementById('management_log').files.length > 0) {
+            setInterval(() => {
+                fetch(`/progress/${uploadId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        const span = document.getElementById('btnText');
+                        if (span && data.status) {
+                            span.textContent = data.status;
+                        }
+                    })
+                    .catch(console.error);
+            }, 1000);
+        }
     });
 </script>
 <style>

@@ -34,15 +34,15 @@ def insert_usb_devices(devices: List[UsbDevice], source_hive: str, db_path: str 
     cursor = conn.cursor()
     
     for device in devices:
-        cursor.execute("SELECT id FROM USB_Device WHERE serial_number = ?", (device.serial_number,))
+        cursor.execute("SELECT id FROM USB_Device WHERE serial_number = ? AND source_hive = ?", (device.serial_number, source_hive))
         result = cursor.fetchone()
         
         if result:
             cursor.execute("""
                 UPDATE USB_Device 
-                SET last_write_time = ?, source_hive = ?
-                WHERE serial_number = ?
-            """, (device.last_write_time, source_hive, device.serial_number))
+                SET last_write_time = ?
+                WHERE serial_number = ? AND source_hive = ?
+            """, (device.last_write_time, device.serial_number, source_hive))
         else:
             cursor.execute("""
                 INSERT INTO USB_Device (
