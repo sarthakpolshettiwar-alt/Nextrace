@@ -1,8 +1,10 @@
 import os
 import sendgrid
 from sendgrid.helpers.mail import Mail, Email, To, Content
+from dotenv import load_dotenv
 import logging
 
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 def send_otp_email(to_email: str, otp_code: str) -> bool:

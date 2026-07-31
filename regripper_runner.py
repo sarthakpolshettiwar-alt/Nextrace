@@ -15,7 +15,7 @@ def run_regripper(hive_path, plugin, rip_path="tools/regripper/rip.exe"):
     
     try:
         # Run RegRipper and capture output
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', check=False)
         
         # rip.exe might return non-zero exit codes even on success depending on the plugin, 
         # but we should check if there's any critical error output.
