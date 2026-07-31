@@ -5,3 +5,7 @@ usb_forensics.db
 __pycache__/
 venv/
 .venv/
+uploads/
+temp_samples/
+*.pdf
+

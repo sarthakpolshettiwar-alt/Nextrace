@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 import json
 import time
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from evtx import PyEvtxParser
@@ -28,7 +31,7 @@ def parse_usb_events(evtx_path, upload_id=None):
     matched_count = 0
     
     def update_progress(msg):
-        print(msg)
+        logger.info(msg)
         if upload_id:
             prog_file = os.path.join('temp_samples', f'{upload_id}_progress.json')
             try:
@@ -52,7 +55,7 @@ def parse_usb_events(evtx_path, upload_id=None):
             xml_str = record['data']
             
             # Early filter to avoid parsing irrelevant events
-            target_ids = ['400', '410', '420', '430', '1010']
+            target_ids = ['400', '410', '420', '430', '1010', '2003', '2100', '2102']
             # Fast plain string check for the Event ID in the XML
             if not any(f">{eid}<" in xml_str for eid in target_ids):
                 scan_time += (time.time() - t0)
@@ -137,7 +140,7 @@ def parse_usb_events(evtx_path, upload_id=None):
                         except ValueError:
                             pass
                             
-                    print(f"[DEBUG] Matched Event ID {event_id} at {timestamp} | SN: '{serial_number}' | Path: '{device_path}'")
+                    logger.debug(f"[DEBUG] Matched Event ID {event_id} at {timestamp} | SN: '{serial_number}' | Path: '{device_path}'")
                             
                     events.append({
                         'timestamp': timestamp,
@@ -151,22 +154,22 @@ def parse_usb_events(evtx_path, upload_id=None):
                 parse_time += (time.time() - t1)
                 
     except TimeoutError as e:
-        print(str(e))
+        logger.error(str(e))
         raise
     except Exception as e:
-        print(f"Error parsing EVTX: {e}")
+        logger.error(f"Error parsing EVTX: {e}")
         
     total_time = time.time() - start_time
-    print(f"EVTX Parsing Complete.")
-    print(f"Total Records Scanned: {count}")
-    print(f"Records Matched for XML Parsing: {matched_count}")
-    print(f"Time spent in pre-filter scan: {scan_time:.3f} seconds")
-    print(f"Time spent in XML parsing: {parse_time:.3f} seconds")
-    print(f"Total processing time: {total_time:.3f} seconds")
+    logger.info(f"EVTX Parsing Complete.")
+    logger.info(f"Total Records Scanned: {count}")
+    logger.info(f"Records Matched for XML Parsing: {matched_count}")
+    logger.info(f"Time spent in pre-filter scan: {scan_time:.3f} seconds")
+    logger.info(f"Time spent in XML parsing: {parse_time:.3f} seconds")
+    logger.info(f"Total processing time: {total_time:.3f} seconds")
     
     config_count = sum(1 for e in events if e['event_id'] in ['400', '410', '420', '430'])
     mgmt_count = sum(1 for e in events if e['event_id'] == '1010')
-    print(f"Parsed {config_count} Configuration events and {mgmt_count} Management events")
+    logger.info(f"Parsed {config_count} Configuration events and {mgmt_count} Management events")
     
     return events
 
@@ -175,9 +178,9 @@ def correlate_events_with_devices(events, devices):
     Matches parsed EVTX events with the USB devices found in the registry hive.
     Matches primarily by serial number.
     """
-    print(f"[DEBUG] correlate_events_with_devices called with {len(events)} EVTX events and {len(devices)} registry devices.")
+    logger.debug(f"[DEBUG] correlate_events_with_devices called with {len(events)} EVTX events and {len(devices)} registry devices.")
     for dev in devices:
-        print(f"[DEBUG] Registry Device -> SN: '{dev.serial_number}', Vendor: '{dev.vendor}', Product: '{dev.product}'")
+        logger.debug(f"[DEBUG] Registry Device -> SN: '{dev.serial_number}', Vendor: '{dev.vendor}', Product: '{dev.product}'")
         
     correlated = []
     for event in events:
@@ -225,7 +228,7 @@ def correlate_events_with_devices(events, devices):
             
     config_match = sum(1 for e in unique_correlated if e['event_id'] in ['400', '410', '420', '430'])
     mgmt_match = sum(1 for e in unique_correlated if e['event_id'] == '1010')
-    print(f"[DEBUG] Matched {config_match} Configuration events and {mgmt_match} Management events")
+    logger.debug(f"[DEBUG] Matched {config_match} Configuration events and {mgmt_match} Management events")
             
     # Sort by timestamp
     return sorted(unique_correlated, key=lambda x: x['timestamp'], reverse=True)

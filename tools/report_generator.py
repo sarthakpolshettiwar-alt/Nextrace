@@ -95,16 +95,39 @@ def generate_pdf_report(results, output_path, case_name="USB Forensic Analysis")
         
     elements.append(Spacer(1, 0.4 * inch))
     
-    # 3. Event Correlation
-    if results.get('events'):
-        elements.append(Paragraph("3. Event Log Correlation", h1_style))
-        data = [[Paragraph("Timestamp", normal_style), Paragraph("Event ID", normal_style), Paragraph("Matched Device", normal_style), Paragraph("Serial Number", normal_style)]]
-        for event in results['events']:
-            data.append([Paragraph(event['timestamp'], normal_style), Paragraph(event['event_id'], normal_style), Paragraph(event['matched_device'], normal_style), Paragraph(event['serial_number'], normal_style)])
+    # 3. USB Session Analytics & Reconstruction
+    if results.get('sessions'):
+        elements.append(Paragraph("3. USB Session Analytics & Reconstruction", h1_style))
+        
+        analytics = results.get('analytics', {})
+        if analytics:
+            summary_data = [
+                [Paragraph("Metric", normal_style), Paragraph("Value", normal_style), Paragraph("Metric", normal_style), Paragraph("Value", normal_style)],
+                [Paragraph("Total Sessions", normal_style), Paragraph(str(analytics.get('total_sessions', 0)), normal_style), Paragraph("Completed Sessions", normal_style), Paragraph(str(analytics.get('completed_sessions', 0)), normal_style)],
+                [Paragraph("Active Sessions", normal_style), Paragraph(str(analytics.get('active_sessions', 0)), normal_style), Paragraph("Unexpected Removals", normal_style), Paragraph(str(analytics.get('unexpected_removals', 0)), normal_style)],
+                [Paragraph("Average Duration", normal_style), Paragraph(str(analytics.get('average_duration_formatted', 'N/A')), normal_style), Paragraph("Total Connected Time", normal_style), Paragraph(str(analytics.get('total_connected_time_formatted', 'N/A')), normal_style)],
+            ]
+            sum_t = Table(summary_data, colWidths=[1.8*inch, 1.7*inch, 1.8*inch, 1.7*inch])
+            sum_t.setStyle(TableStyle(base_table_style))
+            elements.append(sum_t)
+            elements.append(Spacer(1, 0.2 * inch))
+
+        session_table_data = [[Paragraph("Session ID", normal_style), Paragraph("Device", normal_style), Paragraph("Status", normal_style), Paragraph("Duration", normal_style), Paragraph("Connected", normal_style), Paragraph("Disconnected", normal_style)]]
+        
+        for sess in results['sessions']:
+            s_dict = sess.to_dict() if hasattr(sess, 'to_dict') else sess
+            session_table_data.append([
+                Paragraph(s_dict.get('session_id', ''), normal_style),
+                Paragraph(s_dict.get('device_name', ''), normal_style),
+                Paragraph(s_dict.get('status', ''), normal_style),
+                Paragraph(s_dict.get('duration_formatted', ''), normal_style),
+                Paragraph(s_dict.get('connected_timestamp') or 'N/A', normal_style),
+                Paragraph(s_dict.get('disconnected_timestamp') or 'N/A', normal_style)
+            ])
             
-        t = Table(data, colWidths=[1.5*inch, 1.0*inch, 2.5*inch, 2.0*inch])
-        t.setStyle(TableStyle(base_table_style))
-        elements.append(t)
+        st_t = Table(session_table_data, colWidths=[1.1*inch, 1.7*inch, 1.1*inch, 1.0*inch, 1.1*inch, 1.0*inch])
+        st_t.setStyle(TableStyle(base_table_style))
+        elements.append(st_t)
         elements.append(Spacer(1, 0.4 * inch))
         
     # Build PDF

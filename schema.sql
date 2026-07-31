@@ -17,7 +17,9 @@ CREATE TABLE IF NOT EXISTS User (
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    is_verified BOOLEAN DEFAULT 0
+    is_verified BOOLEAN DEFAULT 0,
+    profile_picture TEXT,
+    notify_analysis_complete BOOLEAN DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS Login_Attempts (

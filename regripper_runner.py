@@ -4,6 +4,7 @@ import os
 import sys
 
 def run_regripper(hive_path, plugin, rip_path="tools/regripper/rip.exe"):
+    rip_path = os.environ.get('REGRIPPER_PATH', rip_path)
     if not os.path.exists(hive_path):
         raise FileNotFoundError(f"Registry hive not found: {hive_path}")
     

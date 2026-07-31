@@ -40,12 +40,18 @@
             <a href="{{ url_for('dashboard') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors {% if request.endpoint == 'dashboard' %}bg-brand/10 text-brand{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}">
                 <i data-feather="grid" class="w-5 h-5"></i> Dashboard
             </a>
-            <!-- Removed Cases, Users, Settings as requested -->
+            <a href="{{ url_for('settings.view_settings') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors {% if 'settings' in request.endpoint %}bg-brand/10 text-brand{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+                <i data-feather="settings" class="w-5 h-5"></i> Settings
+            </a>
         </nav>
         <div class="p-4 border-t border-gray-200 bg-gray-50/50">
             <div class="flex items-center gap-3 mb-4 px-2">
-                <div class="w-9 h-9 rounded-full bg-brand/10 flex items-center justify-center text-brand font-bold shadow-sm">
-                    {{ current_user.username[0]|upper }}
+                <div class="w-9 h-9 rounded-full bg-brand/10 flex items-center justify-center text-brand font-bold shadow-sm overflow-hidden flex-shrink-0">
+                    {% if current_user.profile_picture %}
+                        <img src="{{ url_for('static', filename=current_user.profile_picture) }}" alt="Avatar" class="w-full h-full object-cover">
+                    {% else %}
+                        {{ current_user.username[0]|upper }}
+                    {% endif %}
                 </div>
                 <div class="overflow-hidden flex-1">
                     <p class="text-sm font-semibold text-gray-900 truncate">{{ current_user.username }}</p>

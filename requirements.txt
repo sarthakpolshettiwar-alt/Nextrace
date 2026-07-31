@@ -8,3 +8,4 @@ python-dotenv==1.0.0
 Werkzeug==3.0.0
 evtx==0.12.1
 reportlab==4.1.0
+Flask-Limiter==3.5.0

@@ -38,7 +38,7 @@
         <input type="hidden" name="upload_id" id="upload_id" value=""/>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <!-- SYSTEM Hive Upload -->
-            <div>
+            <div class="flex flex-col h-full">
                 <div class="flex items-center justify-between mb-2">
                     <label class="block text-sm font-medium text-gray-700">SYSTEM Registry Hive (Required) *</label>
                     <button type="button" onclick="document.getElementById('hiveHelp').classList.toggle('hidden')" class="text-xs text-brand hover:text-brand-hover flex items-center gap-1 font-medium transition-colors">
@@ -70,7 +70,7 @@
                     </p>
                 </div>
 
-                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-brand/50 transition-colors bg-gray-50">
+                <div class="mt-auto flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-brand/50 transition-colors bg-gray-50">
                     <div class="space-y-1 text-center">
                         <i data-feather="database" class="mx-auto h-8 w-8 text-gray-400"></i>
                         <div class="flex text-sm text-gray-600 justify-center">
@@ -85,7 +85,7 @@
             </div>
 
             <!-- Config Log Upload -->
-            <div>
+            <div class="flex flex-col h-full">
                 <div class="flex items-center justify-between mb-2">
                     <label class="block text-sm font-medium text-gray-700">Device Configuration Log (.evtx)</label>
                     <button type="button" onclick="document.getElementById('configHelp').classList.toggle('hidden')" class="text-xs text-brand hover:text-brand-hover flex items-center gap-1 font-medium transition-colors">
@@ -111,7 +111,7 @@
                 <p class="text-xs text-gray-500 mb-2 flex items-center gap-1">
                     <i data-feather="info" class="w-3.5 h-3.5"></i> Kernel-PnP (IDs 400-430)
                 </p>
-                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-brand/50 transition-colors bg-gray-50">
+                <div class="mt-auto flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-brand/50 transition-colors bg-gray-50">
                     <div class="space-y-1 text-center">
                         <i data-feather="file-text" class="mx-auto h-8 w-8 text-gray-400"></i>
                         <div class="flex text-sm text-gray-600 justify-center">
@@ -126,7 +126,7 @@
             </div>
             
             <!-- Management Log Upload -->
-            <div>
+            <div class="flex flex-col h-full">
                 <div class="flex items-center justify-between mb-2">
                     <label class="block text-sm font-medium text-gray-700">Device Management Log (.evtx)</label>
                     <button type="button" onclick="document.getElementById('managementHelp').classList.toggle('hidden')" class="text-xs text-brand hover:text-brand-hover flex items-center gap-1 font-medium transition-colors">
@@ -152,7 +152,7 @@
                 <p class="text-xs text-gray-500 mb-2 flex items-center gap-1">
                     <i data-feather="info" class="w-3.5 h-3.5"></i> Kernel-PnP (ID 1010)
                 </p>
-                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-brand/50 transition-colors bg-gray-50">
+                <div class="mt-auto flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-brand/50 transition-colors bg-gray-50">
                     <div class="space-y-1 text-center">
                         <i data-feather="file-text" class="mx-auto h-8 w-8 text-gray-400"></i>
                         <div class="flex text-sm text-gray-600 justify-center">
@@ -179,6 +179,244 @@
 <!-- Results Section -->
 {% if results %}
 <div class="space-y-8 animate-fade-in">
+
+    <!-- USB Investigation Summary Dashboard -->
+    {% if results.summary %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8 space-y-6">
+        <div class="flex items-center justify-between pb-4 border-b border-gray-100">
+            <h3 class="text-xl font-bold text-gray-900 flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center text-brand">
+                    <i data-feather="shield" class="w-4 h-4"></i>
+                </div>
+                USB Investigation Summary
+            </h3>
+            <span class="px-3 py-1 text-xs font-semibold rounded-full border
+                {% if results.summary.case_status_badge == 'Investigation Required' %}bg-red-50 text-red-700 border-red-200
+                {% elif results.summary.case_status_badge == 'Multiple USB Devices Detected' %}bg-amber-50 text-amber-700 border-amber-200
+                {% elif results.summary.case_status_badge == 'Frequent USB Usage' %}bg-blue-50 text-blue-700 border-blue-200
+                {% else %}bg-emerald-50 text-emerald-700 border-emerald-200{% endif %}">
+                {{ results.summary.case_status_badge }}
+            </span>
+        </div>
+
+        <!-- Top Row: 3 Compact Stat Cards (1 col mobile, 3 cols desktop) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4">
+            <!-- 1. Total USB Devices -->
+            <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-100 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-700 shrink-0">
+                    <i data-feather="hard-drive" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider">USB Devices</div>
+                    <div class="text-2xl font-bold text-gray-900">{{ results.summary.total_devices }}</div>
+                    <div class="text-[11px] text-gray-500">Unique devices detected</div>
+                </div>
+            </div>
+
+            <!-- 2. Total USB Sessions -->
+            <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-100 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-brand shrink-0">
+                    <i data-feather="layers" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider">USB Sessions</div>
+                    <div class="text-2xl font-bold text-brand">{{ results.summary.total_sessions }}</div>
+                    <div class="text-[11px] text-gray-500">Total usage sessions</div>
+                </div>
+            </div>
+
+
+            <!-- 4. Investigation Period -->
+            <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-100 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-700 shrink-0">
+                    <i data-feather="calendar" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Investigation Period</div>
+                    <div class="text-xs font-bold text-gray-900 font-mono">{{ results.summary.investigation_period }}</div>
+                    <div class="text-[11px] font-semibold text-brand">{{ results.summary.day_count }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Second Row: Case Summary Banner -->
+        <div class="p-4 bg-brand/5 border border-brand/20 rounded-xl flex items-start gap-3 text-sm text-gray-700">
+            <i data-feather="info" class="w-5 h-5 text-brand shrink-0 mt-0.5"></i>
+            <div>
+                <h4 class="font-bold text-gray-900 text-xs uppercase tracking-wider mb-1">Executive Case Findings</h4>
+                <p class="text-xs text-gray-700 leading-relaxed font-medium">{{ results.summary.case_summary_text }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- USB Usage Sessions Section -->
+    {% if results.sessions %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+        <div class="px-6 py-5 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <h3 class="text-lg leading-6 font-bold text-gray-900 flex items-center gap-2">
+                    <i data-feather="layers" class="w-5 h-5 text-gray-400"></i> Correlated USB Usage Sessions
+                </h3>
+                <p class="text-xs text-gray-500 mt-1">Paired connection & disconnection telemetry grouped into logical USB sessions.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="exportFilteredSessionsJson()" class="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <i data-feather="download" class="w-3.5 h-3.5 text-gray-500"></i> Export JSON
+                </button>
+                <button type="button" onclick="exportFilteredSessionsCsv()" class="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <i data-feather="file-text" class="w-3.5 h-3.5 text-gray-500"></i> Export CSV
+                </button>
+            </div>
+        </div>
+
+        <!-- Search & Filter Controls -->
+        <div class="p-6 border-b border-gray-100 bg-gray-50/50">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <!-- Search Input -->
+                <div class="relative md:col-span-2">
+                    <i data-feather="search" class="w-4 h-4 text-gray-400 absolute left-3 top-3"></i>
+                    <input type="text" id="sessionSearchInput" placeholder="Search by Serial Number, Vendor, Device Name, VID, PID, Session ID..." class="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand w-full" onkeyup="filterSessions()">
+                </div>
+                <!-- Status Filter -->
+                <div>
+                    <select id="statusFilter" class="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white" onchange="filterSessions()">
+                        <option value="ALL">All Statuses</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Active">Active / Connected</option>
+                        <option value="Unexpected Removal">Unexpected Removal</option>
+                        <option value="Missing Disconnect Event">Missing Disconnect Event</option>
+                    </select>
+                </div>
+                <!-- Vendor Filter -->
+                <div>
+                    <select id="vendorFilter" class="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white" onchange="filterSessions()">
+                        <option value="ALL">All Vendors</option>
+                        {% set unique_vendors = [] %}
+                        {% for s in results.sessions %}
+                            {% if s.vendor and s.vendor not in unique_vendors and s.vendor != 'Unknown' %}
+                                {% set _ = unique_vendors.append(s.vendor) %}
+                            {% endif %}
+                        {% endfor %}
+                        {% for v in unique_vendors %}
+                        <option value="{{ v }}">{{ v }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sessions Container -->
+        <div class="p-6 space-y-4" id="sessionsList">
+            {% for sess in results.sessions %}
+            {% set sess_loop = loop %}
+            <div class="session-card border border-gray-200 rounded-xl overflow-hidden hover:border-gray-300 transition-all bg-white shadow-xs"
+                 data-session-id="{{ sess.session_id | lower }}"
+                 data-device="{{ sess.device_name | lower }}"
+                 data-vendor="{{ sess.vendor | lower }}"
+                 data-serial="{{ sess.serial_number | lower }}"
+                 data-vid="{{ sess.vid | lower }}"
+                 data-pid="{{ sess.pid | lower }}"
+                 data-status="{{ sess.status }}"
+                  data-connected="{{ sess.connected_timestamp or 'N/A' }}">
+                
+                <!-- Card Header with Rigid Grid Alignment -->
+                <div class="p-4 bg-gray-50/50 grid grid-cols-1 lg:grid-cols-12 gap-4 items-center cursor-pointer hover:bg-gray-50 transition-colors" onclick="toggleSessionDetails('details-{{ loop.index }}', 'chevron-{{ loop.index }}')">
+                    <!-- Left: Device Info -->
+                    <div class="lg:col-span-5 flex items-center gap-3 min-w-0">
+                        <div class="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 font-mono text-xs font-bold shrink-0">
+                            #{{ loop.index }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-gray-900 text-base truncate">{{ sess.device_name }}</span>
+                                <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-mono shrink-0">{{ sess.session_id }}</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs text-gray-500 mt-1 flex-wrap">
+                                <span>Vendor: <strong class="text-gray-700">{{ sess.vendor }}</strong></span>
+                                <span>SN: <code class="bg-gray-100 px-1 rounded font-mono break-all">{{ sess.serial_number }}</code></span>
+                                {% if sess.vid != 'N/A' %}
+                                <span>VID: <code class="font-mono">{{ sess.vid }}</code> PID: <code class="font-mono">{{ sess.pid }}</code></span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Middle: Timestamps & Duration -->
+                    <div class="lg:col-span-4 text-left lg:text-right text-xs">
+                        <div class="font-medium text-gray-900 font-mono text-[11px] leading-tight">
+                            {% if sess.connected_timestamp %}
+                            {{ sess.connected_timestamp }}
+                            {% else %}
+                            <span class="italic text-gray-400">N/A</span>
+                            {% endif %}
+                            &rarr;
+                            {% if sess.disconnected_timestamp %}
+                            {{ sess.disconnected_timestamp }}
+                            {% else %}
+                            <span class="italic text-gray-400">N/A</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-xs text-gray-500 mt-0.5">Duration: <span class="{% if 'No Connect' in sess.duration_formatted or 'N/A' in sess.duration_formatted or 'Missing' in sess.duration_formatted %}text-amber-700 italic font-medium{% else %}text-gray-800 font-bold{% endif %}">{{ sess.duration_formatted }}</span></div>
+                    </div>
+
+                    <!-- Right: Status Badge (Fixed Width) & Chevron -->
+                    <div class="lg:col-span-3 flex items-center justify-end gap-3 min-w-0">
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold shrink-0 text-center shadow-2xs whitespace-nowrap min-w-[145px] inline-block
+                            {% if sess.status == 'Completed' %}bg-emerald-100 text-emerald-800 border border-emerald-200
+                            {% elif sess.status == 'Active' %}bg-blue-100 text-blue-800 border border-blue-200
+                            {% elif sess.status == 'Unexpected Removal' %}bg-red-100 text-red-800 border border-red-200
+                            {% else %}bg-amber-100 text-amber-800 border border-amber-200{% endif %}">
+                            {{ sess.status }}
+                        </span>
+                        <button type="button" class="text-gray-400 hover:text-gray-600 transition-colors p-1 shrink-0">
+                            <i data-feather="chevron-down" id="chevron-{{ loop.index }}" class="w-5 h-5 transition-transform duration-200"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Expanded Content -->
+                <div id="details-{{ loop.index }}" class="hidden border-t border-gray-100 p-5 bg-white space-y-4">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50/70 p-4 rounded-xl text-xs">
+                        <div>
+                            <span class="text-gray-400 block uppercase font-medium text-[10px] mb-0.5">Connection Type</span>
+                            <span class="font-semibold text-gray-800">{{ sess.connection_type }}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400 block uppercase font-medium text-[10px] mb-0.5">Registry Source</span>
+                            <span class="font-semibold text-gray-800">{{ sess.registry_source }}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400 block uppercase font-medium text-[10px] mb-0.5">Event Log Source</span>
+                            <span class="font-semibold text-gray-800">{{ sess.event_log_source }}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400 block uppercase font-medium text-[10px] mb-0.5">Session Integrity Hash</span>
+                            <span class="font-mono text-[10px] text-gray-600 truncate block" title="{{ sess.session_hash }}">{{ sess.session_hash[:16] }}...</span>
+                        </div>
+                    </div>
+
+
+
+                    <!-- Card Action Footer -->
+                    <div class="flex items-center justify-between pt-3 border-t border-gray-100 text-xs">
+                        <div class="text-gray-400 font-mono text-[11px]">Hash: {{ sess.session_hash }}</div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="copySessionJson({{ sess.to_dict() | tojson | forceescape }})" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium transition-colors flex items-center gap-1.5">
+                                <i data-feather="copy" class="w-3.5 h-3.5"></i> Copy Session
+                            </button>
+                            <button type="button" onclick="downloadSingleSessionJson({{ sess.to_dict() | tojson | forceescape }}, '{{ sess.session_id }}')" class="px-3 py-1.5 bg-brand/10 hover:bg-brand/20 text-brand rounded font-medium transition-colors flex items-center gap-1.5">
+                                <i data-feather="download" class="w-3.5 h-3.5"></i> Export Session JSON
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            <p id="noSessionsMessage" class="hidden text-center text-sm text-gray-500 py-8 font-medium">No sessions match your filters.</p>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- 1. USB Devices Detected -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-8">
@@ -233,7 +471,7 @@
     </div>
 
     <!-- 2. Connection Timeline -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-8">
         <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
             <h3 class="text-lg leading-6 font-bold text-gray-900 flex items-center gap-2">
                 <i data-feather="clock" class="w-5 h-5 text-gray-400"></i> Connection Timeline
@@ -289,7 +527,7 @@
     </div>
 
     <!-- 3. Risk Analysis -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-8">
         <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
             <h3 class="text-lg leading-6 font-bold text-gray-900 flex items-center gap-2">
                 <i data-feather="alert-triangle" class="w-5 h-5 text-gray-400"></i> Risk Analysis
@@ -333,46 +571,6 @@
         </div>
     </div>
 
-    <!-- 4. Event Log Correlation -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
-            <h3 class="text-lg leading-6 font-bold text-gray-900 flex items-center gap-2">
-                <i data-feather="activity" class="w-5 h-5 text-gray-400"></i> Event Log Correlation
-            </h3>
-        </div>
-        {% if results.events %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-white">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Timestamp</th>
-                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Event ID</th>
-                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Matched Device (by SN)</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for event in results.events %}
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ event.timestamp }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <span class="px-2 py-1 bg-gray-100 rounded text-xs font-mono border border-gray-200">{{ event.event_id }}</span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-brand">{{ event.matched_device }}</div>
-                            <div class="text-xs text-gray-500 font-mono">{{ event.serial_number }}</div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="p-8 text-center">
-            <p class="text-sm text-gray-500">No event log uploaded or no matching USB connection events found.</p>
-        </div>
-        {% endif %}
-    </div>
-
 
 </div>
 {% endif %}
@@ -385,26 +583,61 @@
     const uploadId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
     document.getElementById('upload_id').value = uploadId;
 
-    document.getElementById('system_hive').addEventListener('change', function(e) {
-        if (e.target.files.length > 0) {
-            document.getElementById('system_hive_name').textContent = e.target.files[0].name;
-            document.getElementById('system_hive_name').classList.add('text-brand', 'font-medium');
-        }
-    });
-    
-    document.getElementById('config_log').addEventListener('change', function(e) {
-        if (e.target.files.length > 0) {
-            document.getElementById('config_log_name').textContent = e.target.files[0].name;
-            document.getElementById('config_log_name').classList.add('text-brand', 'font-medium');
-        }
-    });
+    function setupFileInputHandler(inputId, nameId) {
+        const inputElem = document.getElementById(inputId);
+        const nameElem = document.getElementById(nameId);
+        if (!inputElem || !nameElem) return;
 
-    document.getElementById('management_log').addEventListener('change', function(e) {
-        if (e.target.files.length > 0) {
-            document.getElementById('management_log_name').textContent = e.target.files[0].name;
-            document.getElementById('management_log_name').classList.add('text-brand', 'font-medium');
+        function updateDisplay() {
+            if (inputElem.files && inputElem.files.length > 0) {
+                const fileName = inputElem.files[0].name;
+                nameElem.innerHTML = `<span class="inline-flex items-center gap-1 font-semibold text-emerald-700 max-w-[220px] truncate" title="${fileName}">
+                    <span class="text-emerald-600 font-bold">✓</span> <span class="truncate">${fileName}</span>
+                </span>`;
+                nameElem.className = "text-xs mt-1 block";
+            } else {
+                nameElem.innerHTML = 'No file selected';
+                nameElem.className = 'text-xs text-gray-500 mt-1 block';
+            }
         }
-    });
+
+        inputElem.addEventListener('change', updateDisplay);
+
+        // Drag and Drop support on parent dropzone container
+        const dropzone = inputElem.closest('.border-dashed');
+        if (dropzone) {
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.add('border-brand', 'bg-brand/5');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.remove('border-brand', 'bg-brand/5');
+                }, false);
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                if (dt && dt.files && dt.files.length > 0) {
+                    inputElem.files = dt.files;
+                    updateDisplay();
+                }
+            }, false);
+        }
+
+        // Initial check in case browser cached input state
+        updateDisplay();
+    }
+
+    setupFileInputHandler('system_hive', 'system_hive_name');
+    setupFileInputHandler('config_log', 'config_log_name');
+    setupFileInputHandler('management_log', 'management_log_name');
 
     document.getElementById('uploadForm').addEventListener('submit', function() {
         const btn = document.getElementById('analyzeBtn');
@@ -427,6 +660,153 @@
             }, 1000);
         }
     });
+
+    function toggleSessionDetails(detailsId, chevronId) {
+        const detailsElem = document.getElementById(detailsId);
+        const chevronElem = document.getElementById(chevronId);
+        if (detailsElem) {
+            detailsElem.classList.toggle('hidden');
+        }
+        if (chevronElem) {
+            chevronElem.classList.toggle('rotate-180');
+        }
+    }
+
+    function filterSessions() {
+        const queryInput = document.getElementById('sessionSearchInput');
+        const statusSelect = document.getElementById('statusFilter');
+        const vendorSelect = document.getElementById('vendorFilter');
+        
+        if (!queryInput || !statusSelect || !vendorSelect) return;
+        
+        const query = queryInput.value.toLowerCase().trim();
+        const statusVal = statusSelect.value;
+        const vendorVal = vendorSelect.value.toLowerCase();
+        
+        const cards = document.querySelectorAll('.session-card');
+        let visibleCount = 0;
+        
+        cards.forEach(card => {
+            const sid = card.getAttribute('data-session-id') || '';
+            const device = card.getAttribute('data-device') || '';
+            const vendor = card.getAttribute('data-vendor') || '';
+            const serial = card.getAttribute('data-serial') || '';
+            const vid = card.getAttribute('data-vid') || '';
+            const pid = card.getAttribute('data-pid') || '';
+            const status = card.getAttribute('data-status') || '';
+            
+            const matchesQuery = !query || sid.includes(query) || device.includes(query) || vendor.includes(query) || serial.includes(query) || vid.includes(query) || pid.includes(query);
+            const matchesStatus = statusVal === 'ALL' || status === statusVal;
+            const matchesVendor = vendorVal === 'all' || vendor === vendorVal;
+            
+            if (matchesQuery && matchesStatus && matchesVendor) {
+                card.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                card.classList.add('hidden');
+            }
+        });
+        
+        const noMsg = document.getElementById('noSessionsMessage');
+        if (noMsg) {
+            if (visibleCount === 0) {
+                noMsg.classList.remove('hidden');
+            } else {
+                noMsg.classList.add('hidden');
+            }
+        }
+    }
+
+    function getFilteredSessionsData() {
+        const visibleCards = document.querySelectorAll('.session-card:not(.hidden)');
+        const visibleIds = new Set();
+        visibleCards.forEach(card => {
+            const sid = card.getAttribute('data-session-id');
+            if (sid) visibleIds.add(sid.toLowerCase());
+        });
+        
+        const rawSessions = [
+            {% if results and results.sessions %}
+            {% for sess in results.sessions %}
+            {{ sess.to_dict() | tojson }}{% if not loop.last %},{% endif %}
+            {% endfor %}
+            {% endif %}
+        ];
+        
+        return rawSessions.filter(s => visibleIds.has((s.session_id || '').toLowerCase()));
+    }
+
+    function exportFilteredSessionsJson() {
+        const filtered = getFilteredSessionsData();
+        const jsonStr = JSON.stringify(filtered, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `USB_Sessions_Export.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function exportFilteredSessionsCsv() {
+        const filtered = getFilteredSessionsData();
+        const headers = ['Session ID', 'Device Name', 'Vendor', 'Product', 'Serial Number', 'VID', 'PID', 'Connected Timestamp', 'Disconnected Timestamp', 'Duration', 'Status', 'Registry Source', 'Event Log Source', 'Session Hash'];
+        
+        let csvContent = headers.join(',') + '\n';
+        filtered.forEach(s => {
+            const row = [
+                `"${(s.session_id || '').replace(/"/g, '""')}"`,
+                `"${(s.device_name || '').replace(/"/g, '""')}"`,
+                `"${(s.vendor || '').replace(/"/g, '""')}"`,
+                `"${(s.product || '').replace(/"/g, '""')}"`,
+                `"${(s.serial_number || '').replace(/"/g, '""')}"`,
+                `"${(s.vid || '').replace(/"/g, '""')}"`,
+                `"${(s.pid || '').replace(/"/g, '""')}"`,
+                `"${(s.connected_timestamp || '').replace(/"/g, '""')}"`,
+                `"${(s.disconnected_timestamp || '').replace(/"/g, '""')}"`,
+                `"${(s.duration_formatted || '').replace(/"/g, '""')}"`,
+                `"${(s.status || '').replace(/"/g, '""')}"`,
+                `"${(s.registry_source || '').replace(/"/g, '""')}"`,
+                `"${(s.event_log_source || '').replace(/"/g, '""')}"`,
+                `"${(s.session_hash || '').replace(/"/g, '""')}"`
+            ];
+            csvContent += row.join(',') + '\n';
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `USB_Sessions_Export.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function copySessionJson(sessionObj) {
+        const jsonText = typeof sessionObj === 'string' ? sessionObj : JSON.stringify(sessionObj, null, 2);
+        navigator.clipboard.writeText(jsonText).then(() => {
+            alert('Copied session JSON to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy session JSON:', err);
+        });
+    }
+
+    function downloadSingleSessionJson(sessionObj, sessionId) {
+        const jsonText = typeof sessionObj === 'string' ? sessionObj : JSON.stringify(sessionObj, null, 2);
+        const blob = new Blob([jsonText], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${sessionId || 'session'}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 </script>
 <style>
     .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }

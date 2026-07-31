@@ -1,5 +1,7 @@
 import sqlite3
 import os
+import datetime
+import math
 from typing import List
 from usbstor_parser import UsbDevice
 
@@ -12,7 +14,7 @@ def get_db_connection():
     return conn
 
 def setup_database(db_path: str = DB_NAME):
-    """Initialize the database with the schema."""
+    """Initialize the database with the schema and run migrations."""
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
@@ -22,6 +24,14 @@ def setup_database(db_path: str = DB_NAME):
     else:
         raise FileNotFoundError(f"Schema file not found: {SCHEMA_FILE}")
         
+    # Check for missing columns in User table for existing DBs
+    cursor.execute("PRAGMA table_info(User)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if "profile_picture" not in columns:
+        cursor.execute("ALTER TABLE User ADD COLUMN profile_picture TEXT")
+    if "notify_analysis_complete" not in columns:
+        cursor.execute("ALTER TABLE User ADD COLUMN notify_analysis_complete BOOLEAN DEFAULT 1")
+
     conn.commit()
     conn.close()
 
@@ -114,6 +124,43 @@ def get_recent_failed_logins(email, minutes=15):
     conn.close()
     return count
 
+def get_login_lockout_info(email, max_attempts=5, window_minutes=15):
+    if not email:
+        return False, 0, 0
+    conn = get_db_connection()
+    rows = conn.execute('''
+        SELECT timestamp FROM Login_Attempts 
+        WHERE email = ? AND success = 0 
+        AND timestamp >= datetime('now', ?)
+        ORDER BY timestamp ASC
+    ''', (email, f'-{window_minutes} minutes')).fetchall()
+    conn.close()
+
+    count = len(rows)
+    if count < max_attempts:
+        return False, 0, count
+
+    target_row = rows[count - max_attempts]
+    ts_str = target_row['timestamp'] if isinstance(target_row, sqlite3.Row) else target_row[0]
+
+    try:
+        attempt_time = datetime.datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        try:
+            attempt_time = datetime.datetime.fromisoformat(str(ts_str).replace('Z', ''))
+        except Exception:
+            attempt_time = datetime.datetime.utcnow()
+
+    unlock_time = attempt_time + datetime.timedelta(minutes=window_minutes)
+    now_utc = datetime.datetime.utcnow()
+
+    remaining_seconds = (unlock_time - now_utc).total_seconds()
+    remaining_minutes = math.ceil(remaining_seconds / 60)
+    if remaining_minutes <= 0:
+        remaining_minutes = 1
+
+    return True, remaining_minutes, count
+
 def add_trusted_device(user_id, device_token, expires_at):
     conn = get_db_connection()
     conn.execute('INSERT INTO TrustedDevices (user_id, device_token, expires_at) VALUES (?, ?, ?)',
@@ -199,3 +246,61 @@ def get_paginated_activity_log(page=1, per_page=25, search_email=None):
     
     conn.close()
     return [dict(row) for row in rows], total
+
+# --- Settings Helper Functions ---
+
+def update_user_profile(user_id, username, profile_picture=None):
+    conn = get_db_connection()
+    if profile_picture is not None:
+        conn.execute('UPDATE User SET username = ?, profile_picture = ? WHERE id = ?',
+                     (username, profile_picture, user_id))
+    else:
+        conn.execute('UPDATE User SET username = ? WHERE id = ?',
+                     (username, user_id))
+    conn.commit()
+    conn.close()
+
+def update_user_password_by_id(user_id, password_hash):
+    conn = get_db_connection()
+    conn.execute('UPDATE User SET password_hash = ? WHERE id = ?', (password_hash, user_id))
+    conn.commit()
+    conn.close()
+
+def update_user_notification_prefs(user_id, notify_analysis_complete):
+    conn = get_db_connection()
+    conn.execute('UPDATE User SET notify_analysis_complete = ? WHERE id = ?',
+                 (1 if notify_analysis_complete else 0, user_id))
+    conn.commit()
+    conn.close()
+
+def get_user_trusted_devices(user_id):
+    conn = get_db_connection()
+    rows = conn.execute('''
+        SELECT * FROM TrustedDevices 
+        WHERE user_id = ? 
+        ORDER BY created_at DESC
+    ''', (user_id,)).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def remove_trusted_device(device_id, user_id):
+    conn = get_db_connection()
+    conn.execute('DELETE FROM TrustedDevices WHERE id = ? AND user_id = ?', (device_id, user_id))
+    conn.commit()
+    conn.close()
+
+def remove_all_trusted_devices(user_id):
+    conn = get_db_connection()
+    conn.execute('DELETE FROM TrustedDevices WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+
+def delete_user_account(user_id, email):
+    conn = get_db_connection()
+    conn.execute('DELETE FROM TrustedDevices WHERE user_id = ?', (user_id,))
+    conn.execute('DELETE FROM Login_Attempts WHERE email = ?', (email,))
+    conn.execute('DELETE FROM PasswordReset WHERE email = ?', (email,))
+    conn.execute('DELETE FROM User WHERE id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+
