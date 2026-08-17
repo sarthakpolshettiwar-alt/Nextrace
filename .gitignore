@@ -1,11 +1,14 @@
 .env
+.env.local
+*.key
+*.pyc
 *.hive
 *.evtx
 usb_forensics.db
+*.db
 __pycache__/
 venv/
 .venv/
 uploads/
 temp_samples/
 *.pdf
-

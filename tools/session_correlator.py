@@ -301,8 +301,9 @@ class UsbSessionCorrelator:
             duration_formatted = "Active / Incomplete"
             status = "Active" if (datetime.now() - conn_dt).total_seconds() < 86400 else "Missing Disconnect Event"
         elif not has_connect_event and has_disconnect_event:
-            status = "Unexpected Removal"
+            status = "Disconnected"
             duration_formatted = "No Connect Event"
+
 
         return UsbSession(
             session_id=session_id,

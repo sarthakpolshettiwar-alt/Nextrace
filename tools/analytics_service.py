@@ -12,7 +12,8 @@ class UsbAnalyticsService:
         
         completed_sessions = sum(1 for s in sessions if s.status == "Completed")
         active_sessions = sum(1 for s in sessions if s.status == "Active")
-        unexpected_removals = sum(1 for s in sessions if s.status == "Unexpected Removal")
+        unexpected_removals = sum(1 for s in sessions if s.status in ("Unexpected Removal", "Disconnected"))
+
         missing_disconnects = sum(1 for s in sessions if s.status == "Missing Disconnect Event")
 
         # Durations

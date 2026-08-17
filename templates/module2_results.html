@@ -1,0 +1,1459 @@
+{% extends "app_base.html" %}
+{% block title %}Forensic Report - {{ record.filename }} - Forenix{% endblock %}
+
+{% block content %}
+<!-- Floating Toast Notification for Copying Evidence -->
+<div id="toast-notification" class="fixed bottom-5 right-5 z-50 transform translate-y-10 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2 bg-gray-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-gray-700">
+    <i data-feather="check-circle" class="w-4 h-4 text-green-400"></i>
+    <span id="toast-message">Copied to clipboard</span>
+</div>
+
+<!-- Top Header & Actions -->
+<div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+        <div class="flex items-center gap-3 text-sm text-gray-500 mb-2">
+            <a href="{{ url_for('dashboard') }}" class="hover:text-brand transition-colors flex items-center gap-1">
+                <i data-feather="arrow-left" class="w-4 h-4"></i> Dashboard
+            </a>
+            <i data-feather="chevron-right" class="w-4 h-4"></i>
+            <a href="{{ url_for('email_forensics.upload') }}" class="hover:text-brand transition-colors">Email Forensic Analysis</a>
+            <i data-feather="chevron-right" class="w-4 h-4"></i>
+            <span class="text-gray-900 font-medium">Forensic Report #{{ record.id }}</span>
+        </div>
+        <h1 class="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center text-brand">
+                <i data-feather="file-text" class="w-5 h-5"></i>
+            </div>
+            Email Forensic Report
+        </h1>
+        <p class="text-xs text-gray-500 mt-1">Investigated File: <span class="font-semibold text-gray-800">{{ record.filename }}</span> &bull; Uploaded: {{ record.upload_timestamp }}</p>
+    </div>
+
+    <div class="flex items-center gap-2 flex-wrap">
+        <button type="button" onclick="copyFullReportEvidence()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-4 py-2.5 rounded-xl transition-colors text-sm flex items-center gap-2 border border-gray-200 shadow-sm">
+            <i data-feather="copy" class="w-4 h-4"></i> Copy Full Evidence
+        </button>
+        <a href="{{ url_for('email_forensics.generate_pdf', analysis_id=record.id) }}" class="bg-brand hover:bg-brand-hover text-white font-semibold px-4 py-2.5 rounded-xl transition-colors text-sm flex items-center gap-2 shadow-sm">
+            <i data-feather="download" class="w-4 h-4"></i> Download PDF Report
+        </a>
+        <a href="{{ url_for('email_forensics.upload') }}" class="bg-gray-50 hover:bg-gray-100 text-gray-600 font-medium px-4 py-2.5 rounded-xl transition-colors text-sm flex items-center gap-2 border border-gray-200">
+            <i data-feather="plus" class="w-4 h-4"></i> New Investigation
+        </a>
+    </div>
+</div>
+
+<!-- View Mode Switcher: Simple Summary vs Full Technical Audit -->
+<div class="mb-6 flex items-center bg-gray-100 p-1.5 rounded-2xl border border-gray-200 w-fit">
+    <button type="button" id="btn-simple-summary" onclick="showView('simple')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm bg-white text-gray-900 flex items-center gap-2">
+        <i data-feather="eye" class="w-4 h-4 text-brand"></i> Simple Summary
+    </button>
+    <button type="button" id="btn-full-audit" onclick="showView('full')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition-all text-gray-600 hover:text-gray-900 flex items-center gap-2">
+        <i data-feather="cpu" class="w-4 h-4"></i> Full Technical Audit
+    </button>
+</div>
+
+<!-- ========================================================================= -->
+<!-- VIEW 1: SIMPLE SUMMARY (DEFAULT CONSUMER VIEW) -->
+<!-- ========================================================================= -->
+<div id="simple-summary-view" class="space-y-6">
+
+    <!-- HARD OVERRIDE ALERT BANNER (If applicable) -->
+    {% if data.risk_result.hard_flagged %}
+    <div class="bg-red-50 border-2 border-red-500/40 rounded-2xl p-6 shadow-sm flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+            <i data-feather="shield-off" class="w-6 h-6"></i>
+        </div>
+        <div>
+            <h3 class="text-lg font-bold text-red-900 flex items-center gap-2">
+                HARD OVERRIDE FLAGGED &bull; LIKELY SPOOFED
+            </h3>
+            <p class="text-sm text-red-700 mt-1 font-medium">
+                {{ data.risk_result.hard_flag_reason or "Both SPF and DKIM authentication checks failed. This email is forced to Likely Spoofed verdict regardless of numerical score." }}
+            </p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Plain-English Verdict Summary Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+        <div class="flex flex-col lg:flex-row items-center gap-8">
+            <div class="flex flex-col items-center justify-center text-center">
+                <div class="w-32 h-32 rounded-full flex flex-col items-center justify-center shadow-inner border-4 {% if data.risk_result.hard_flagged or data.risk_result.risk_band == 'Likely Spoofed' %}bg-red-50 border-red-500 text-red-700{% elif data.risk_result.risk_band == 'High Risk' %}bg-orange-50 border-orange-500 text-orange-700{% elif data.risk_result.risk_band == 'Medium Risk' %}bg-amber-50 border-amber-500 text-amber-700{% else %}bg-green-50 border-green-500 text-green-700{% endif %}">
+                    <span class="text-4xl font-extrabold">{{ data.risk_result.total_score }}</span>
+                    <span class="text-xs font-bold uppercase tracking-wider opacity-75">/ 100</span>
+                </div>
+            </div>
+
+            <div class="flex-1 text-center lg:text-left space-y-3">
+                <div class="flex items-center justify-center lg:justify-start gap-3">
+                    <h2 class="text-2xl font-extrabold text-gray-900">Overall Security Verdict</h2>
+                    {% if data.risk_result.hard_flagged or data.risk_result.risk_band == 'Likely Spoofed' %}
+                        <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase bg-red-100 text-red-800 tracking-wider">Likely Spoofed</span>
+                    {% elif data.risk_result.risk_band == 'High Risk' %}
+                        <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase bg-orange-100 text-orange-800 tracking-wider">High Risk</span>
+                    {% elif data.risk_result.risk_band == 'Medium Risk' %}
+                        <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase bg-amber-100 text-amber-800 tracking-wider">Medium Risk</span>
+                    {% else %}
+                        <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase bg-green-100 text-green-800 tracking-wider">Low Risk</span>
+                    {% endif %}
+                </div>
+
+                <!-- Plain-English Explanation -->
+                <p class="text-base text-gray-800 font-medium p-4 bg-gray-50 rounded-xl border border-gray-100">
+                    {{ data.risk_result.verdict_explanation or "Email forensic evaluation complete." }}
+                </p>
+
+                <div class="text-xs text-gray-500 flex flex-wrap gap-4 pt-1">
+                    <span>From: <strong class="text-gray-900">{{ data.parsed_email.from_address or 'Unknown' }}</strong></span>
+                    <span>Subject: <strong class="text-gray-900">{{ data.parsed_email.subject or '(No Subject)' }}</strong></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actionable Attachment Risk Section -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <i data-feather="paperclip" class="w-5 h-5 text-brand"></i> Attachment Risk Summary
+        </h3>
+
+        {% if not data.attachment_result or not data.attachment_result.attachments %}
+            <p class="text-sm text-gray-600 p-4 bg-gray-50 rounded-xl flex items-center gap-2">
+                <i data-feather="check-circle" class="w-4 h-4 text-green-600"></i> No file attachments were found in this email.
+            </p>
+        {% else %}
+            <div class="space-y-3">
+                {% for att in data.attachment_result.attachments %}
+                <div class="p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 {% if att.flags %}bg-red-50 border-red-200{% else %}bg-gray-50 border-gray-200{% endif %}">
+                    <div>
+                        <div class="font-bold text-gray-900 flex items-center gap-2 text-sm">
+                            <i data-feather="file" class="w-4 h-4 text-gray-500"></i> {{ att.filename }}
+                            <span class="text-xs font-mono text-gray-500">({{ att.size }} bytes)</span>
+                        </div>
+                        <p class="text-xs text-gray-600 mt-1">Claimed Type: <span class="font-mono font-semibold">{{ att.claimed_extension }}</span> &bull; Detected Magic Bytes: <span class="font-mono font-semibold">{{ att.detected_mime }}</span></p>
+                    </div>
+
+                    <div>
+                        {% if att.flags %}
+                            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-800">
+                                <i data-feather="alert-triangle" class="w-3.5 h-3.5"></i> Dangerous File Detected
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-800">
+                                <i data-feather="check-circle" class="w-3.5 h-3.5"></i> Safe Attachment
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- ========================================================================= -->
+<!-- VIEW 2: FULL TECHNICAL AUDIT (ENTERPRISE DEFENDER-STYLE DASHBOARD) -->
+<!-- ========================================================================= -->
+<div id="full-audit-view" class="hidden space-y-8">
+
+    <!-- HARD OVERRIDE ALERT BANNER -->
+    {% if data.risk_result.hard_flagged %}
+    <div class="bg-red-50 border-2 border-red-500/40 rounded-2xl p-6 shadow-sm flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+            <i data-feather="shield-off" class="w-6 h-6"></i>
+        </div>
+        <div>
+            <h3 class="text-lg font-bold text-red-900 flex items-center gap-2">
+                HARD OVERRIDE FLAGGED &bull; LIKELY SPOOFED
+            </h3>
+            <p class="text-sm text-red-700 mt-1 font-medium">
+                {{ data.risk_result.hard_flag_reason or "Both SPF and DKIM authentication checks failed. This email is forced to Likely Spoofed verdict regardless of numerical score." }}
+            </p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Overall Score & Enterprise Audit Trail Dashboard -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+        <div class="flex flex-col lg:flex-row items-center gap-8 pb-8 border-b border-gray-200">
+            <div class="flex flex-col items-center justify-center text-center">
+                <div class="w-32 h-32 rounded-full flex flex-col items-center justify-center shadow-inner border-4 {% if data.risk_result.hard_flagged or data.risk_result.risk_band == 'Likely Spoofed' %}bg-red-50 border-red-500 text-red-700{% elif data.risk_result.risk_band == 'High Risk' %}bg-orange-50 border-orange-500 text-orange-700{% elif data.risk_result.risk_band == 'Medium Risk' %}bg-amber-50 border-amber-500 text-amber-700{% else %}bg-green-50 border-green-500 text-green-700{% endif %}">
+                    <span class="text-4xl font-extrabold">{{ data.risk_result.total_score }}</span>
+                    <span class="text-xs font-bold uppercase tracking-wider opacity-75">/ 100</span>
+                </div>
+            </div>
+
+            <div class="flex-1 text-center lg:text-left">
+                <div class="flex items-center justify-center lg:justify-start gap-3 mb-2">
+                    <h2 class="text-2xl font-extrabold text-gray-900">Overall Forensic Verdict</h2>
+                    {% if data.risk_result.hard_flagged or data.risk_result.risk_band == 'Likely Spoofed' %}
+                        <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase bg-red-100 text-red-800 tracking-wider">Likely Spoofed</span>
+                    {% elif data.risk_result.risk_band == 'High Risk' %}
+                        <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase bg-orange-100 text-orange-800 tracking-wider">High Risk</span>
+                    {% elif data.risk_result.risk_band == 'Medium Risk' %}
+                        <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase bg-amber-100 text-amber-800 tracking-wider">Medium Risk</span>
+                    {% else %}
+                        <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase bg-green-100 text-green-800 tracking-wider">Low Risk</span>
+                    {% endif %}
+                </div>
+                <p class="text-sm text-gray-600 mb-3">
+                    Evaluated across Authentication, Domain Intelligence, Link Analysis, and Attachment Security layers.
+                </p>
+                <div class="text-xs text-gray-500 space-y-1">
+                    <p>&bull; Raw Uncapped Score: <span class="font-bold text-gray-900">{{ data.risk_result.raw_score }} pts</span></p>
+                    <p>&bull; Hard Override Triggered: <span class="font-bold text-gray-900">{{ "Yes" if data.risk_result.hard_flagged else "No" }}</span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- ENTERPRISE AUDIT TRAIL BREAKDOWN TOOLBAR & TABLE -->
+        <!-- ========================================================================= -->
+        <div class="mt-8">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <i data-feather="list" class="w-5 h-5 text-brand"></i> Forensic Audit Trail Breakdown
+                    </h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Click any row to expand deep evidence context.</p>
+                </div>
+
+                <!-- Interactive Filters: Search, Flagged Filter, Sort -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <!-- Search Input -->
+                    <div class="relative">
+                        <input type="text" id="rule-search" onkeyup="filterAuditTrail()" placeholder="Search rules..." class="pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand focus:border-brand w-40 md:w-48 text-gray-900">
+                        <i data-feather="search" class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5"></i>
+                    </div>
+
+                    <!-- Filter Toggle Buttons -->
+                    <div class="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200 text-xs">
+                        <button type="button" id="filter-all-btn" onclick="setFilterMode('all')" class="px-2.5 py-1 rounded font-bold bg-white text-gray-900 shadow-xs">All</button>
+                        <button type="button" id="filter-flagged-btn" onclick="setFilterMode('flagged')" class="px-2.5 py-1 rounded font-bold text-gray-600 hover:text-gray-900">Flagged Only</button>
+                    </div>
+
+                    <!-- Sort Select -->
+                    <select id="rule-sort" onchange="sortAuditTrail()" class="px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand focus:border-brand text-gray-700 bg-white font-medium">
+                        <option value="default">Default Order</option>
+                        <option value="points-desc">Highest Points First</option>
+                        <option value="points-asc">Lowest Points First</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Redesigned Enterprise Table Container -->
+            <div class="overflow-x-auto border border-gray-200 rounded-2xl shadow-xs max-h-[600px] overflow-y-auto">
+                <table class="w-full text-left text-sm text-gray-600 border-collapse" id="audit-table">
+                    <!-- Sticky Header -->
+                    <thead class="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm text-xs text-gray-500 uppercase border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3.5 w-10"></th>
+                            <th class="px-4 py-3.5">Category</th>
+                            <th class="px-4 py-3.5">Rule Checked</th>
+                            <th class="px-4 py-3.5">Evaluated Status</th>
+                            <th class="px-4 py-3.5 text-right">Points</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 bg-white" id="audit-table-body">
+
+                        <!-- RULE 1: SPF Status -->
+                        {% set spf_status = data.auth_result.spf.status if data.auth_result.spf else 'None' %}
+                        {% set spf_pts = 25 if spf_status == 'Fail' else (12 if spf_status == 'SoftFail' else (0 if spf_status == 'Pass' else 8)) %}
+                        <tr class="audit-row transition-colors hover:bg-gray-50 cursor-pointer" data-category="Authentication" data-rule="SPF Status" data-points="{{ spf_pts }}" data-flagged="{{ 'true' if spf_pts > 0 else 'false' }}" onclick="toggleRow('drawer-spf')">
+                            <td class="px-4 py-3.5 text-center text-gray-400">
+                                <i data-feather="chevron-right" id="arrow-drawer-spf" class="w-4 h-4 transition-transform duration-200"></i>
+                            </td>
+                            <td class="px-4 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wider">Authentication</td>
+                            <td class="px-4 py-3.5 font-semibold text-gray-900 flex items-center gap-1.5">
+                                SPF Status
+                                <span class="group relative cursor-help">
+                                    <i data-feather="info" class="w-3.5 h-3.5 text-gray-400 hover:text-brand"></i>
+                                    <span class="pointer-events-none absolute left-6 top-0 hidden w-64 rounded-lg bg-gray-900 p-2.5 text-xs font-normal text-white shadow-xl group-hover:block z-30">
+                                        Verifies whether the sending server IP address is authorized in DNS to send email on behalf of the domain.
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5">
+                                {% if spf_status == 'Pass' %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-green-100 text-green-800 border border-green-200"><i data-feather="check" class="w-3 h-3"></i> Pass</span>
+                                {% elif spf_status == 'Fail' %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-red-100 text-red-800 border border-red-200"><i data-feather="x" class="w-3 h-3"></i> Fail</span>
+                                {% elif spf_status == 'SoftFail' %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-amber-100 text-amber-800 border border-amber-200"><i data-feather="alert-triangle" class="w-3 h-3"></i> SoftFail</span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">— {{ spf_status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-bold {% if spf_pts > 0 %}text-red-600{% else %}text-gray-400{% endif %}">+{{ spf_pts }}</td>
+                        </tr>
+                        <!-- SPF Drawer -->
+                        <tr id="drawer-spf" class="hidden bg-gray-50/80 border-t-0">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-gray-700 uppercase tracking-wider">SPF Forensic Evidence</span>
+                                        <button type="button" onclick="event.stopPropagation(); copyText('SPF Status: {{ spf_status }}\nIP: {{ data.auth_result.spf.ip_used }}\nDomain: {{ data.auth_result.spf.domain_checked }}\nRecord: {{ data.auth_result.spf.raw_record }}')" class="text-brand hover:underline font-semibold flex items-center gap-1"><i data-feather="copy" class="w-3 h-3"></i> Copy Evidence</button>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        <div>Connecting Sender IP: <strong class="font-mono text-gray-900">{{ data.auth_result.spf.ip_used or 'N/A' }}</strong></div>
+                                        <div>SPF Domain Checked: <strong class="font-mono text-gray-900">{{ data.auth_result.spf.domain_checked or 'N/A' }}</strong></div>
+                                    </div>
+                                    {% if data.auth_result.spf.raw_record %}
+                                        <div class="p-2.5 bg-white rounded-lg border border-gray-200 font-mono text-xs text-gray-800 break-all">Raw DNS TXT Record: {{ data.auth_result.spf.raw_record }}</div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- RULE 2: DKIM Status -->
+                        {% set dkim_status = data.auth_result.dkim.status if data.auth_result.dkim else 'Missing' %}
+                        {% set dkim_pts = 25 if dkim_status == 'Fail' else (10 if dkim_status in ('Missing', 'Unable to verify') else 0) %}
+                        <tr class="audit-row transition-colors hover:bg-gray-50 cursor-pointer" data-category="Authentication" data-rule="DKIM Status" data-points="{{ dkim_pts }}" data-flagged="{{ 'true' if dkim_pts > 0 else 'false' }}" onclick="toggleRow('drawer-dkim')">
+                            <td class="px-4 py-3.5 text-center text-gray-400">
+                                <i data-feather="chevron-right" id="arrow-drawer-dkim" class="w-4 h-4 transition-transform duration-200"></i>
+                            </td>
+                            <td class="px-4 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wider">Authentication</td>
+                            <td class="px-4 py-3.5 font-semibold text-gray-900 flex items-center gap-1.5">
+                                DKIM Status
+                                <span class="group relative cursor-help">
+                                    <i data-feather="info" class="w-3.5 h-3.5 text-gray-400 hover:text-brand"></i>
+                                    <span class="pointer-events-none absolute left-6 top-0 hidden w-64 rounded-lg bg-gray-900 p-2.5 text-xs font-normal text-white shadow-xl group-hover:block z-30">
+                                        Validates the cryptographic digital signature attached to email headers to guarantee message integrity.
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5">
+                                {% if dkim_status == 'Pass' %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-green-100 text-green-800 border border-green-200"><i data-feather="check" class="w-3 h-3"></i> Pass</span>
+                                {% elif dkim_status == 'Fail' %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-red-100 text-red-800 border border-red-200"><i data-feather="x" class="w-3 h-3"></i> Fail</span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">— {{ dkim_status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-bold {% if dkim_pts > 0 %}text-red-600{% else %}text-gray-400{% endif %}">+{{ dkim_pts }}</td>
+                        </tr>
+                        <!-- DKIM Drawer -->
+                        <tr id="drawer-dkim" class="hidden bg-gray-50/80 border-t-0">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-gray-700 uppercase tracking-wider">DKIM Cryptographic Evidence</span>
+                                        <button type="button" onclick="event.stopPropagation(); copyText('DKIM Status: {{ dkim_status }}\nSigning Domain: {{ data.auth_result.dkim.domain_checked }}\nSelector: {{ data.auth_result.dkim.selector }}')" class="text-brand hover:underline font-semibold flex items-center gap-1"><i data-feather="copy" class="w-3 h-3"></i> Copy Evidence</button>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        <div>Signing Domain: <strong class="font-mono text-gray-900">{{ data.auth_result.dkim.domain_checked or 'N/A' }}</strong></div>
+                                        <div>DKIM Selector (s=): <strong class="font-mono text-gray-900">{{ data.auth_result.dkim.selector or 'N/A' }}</strong></div>
+                                    </div>
+                                    {% if data.auth_result.dkim.reason %}
+                                        <div class="p-2.5 bg-white rounded-lg border border-gray-200 italic text-gray-600">Details: {{ data.auth_result.dkim.reason }}</div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- RULE 3: DMARC Status -->
+                        {% set dmarc_status = data.auth_result.dmarc.status if data.auth_result.dmarc else 'None' %}
+                        {% set dmarc_pts = 20 if dmarc_status == 'Fail' else (0 if dmarc_status == 'Pass' else 5) %}
+                        <tr class="audit-row transition-colors hover:bg-gray-50 cursor-pointer" data-category="Authentication" data-rule="DMARC Status" data-points="{{ dmarc_pts }}" data-flagged="{{ 'true' if dmarc_pts > 0 else 'false' }}" onclick="toggleRow('drawer-dmarc')">
+                            <td class="px-4 py-3.5 text-center text-gray-400">
+                                <i data-feather="chevron-right" id="arrow-drawer-dmarc" class="w-4 h-4 transition-transform duration-200"></i>
+                            </td>
+                            <td class="px-4 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wider">Authentication</td>
+                            <td class="px-4 py-3.5 font-semibold text-gray-900 flex items-center gap-1.5">
+                                DMARC Status
+                                <span class="group relative cursor-help">
+                                    <i data-feather="info" class="w-3.5 h-3.5 text-gray-400 hover:text-brand"></i>
+                                    <span class="pointer-events-none absolute left-6 top-0 hidden w-64 rounded-lg bg-gray-900 p-2.5 text-xs font-normal text-white shadow-xl group-hover:block z-30">
+                                        Evaluates domain policy enforcement for SPF and DKIM alignment to prevent email spoofing.
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5">
+                                {% if dmarc_status == 'Pass' %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-green-100 text-green-800 border border-green-200"><i data-feather="check" class="w-3 h-3"></i> Pass</span>
+                                {% elif dmarc_status == 'Fail' %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-red-100 text-red-800 border border-red-200"><i data-feather="x" class="w-3 h-3"></i> Fail</span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">— {{ dmarc_status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-bold {% if dmarc_pts > 0 %}text-red-600{% else %}text-gray-400{% endif %}">+{{ dmarc_pts }}</td>
+                        </tr>
+                        <!-- DMARC Drawer -->
+                        <tr id="drawer-dmarc" class="hidden bg-gray-50/80 border-t-0">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-gray-700 uppercase tracking-wider">DMARC Policy Evidence</span>
+                                        <button type="button" onclick="event.stopPropagation(); copyText('DMARC Status: {{ dmarc_status }}\nDomain: {{ data.auth_result.dmarc.domain_checked }}\nPolicy: {{ data.auth_result.dmarc.policy }}\nRecord: {{ data.auth_result.dmarc.raw_record }}')" class="text-brand hover:underline font-semibold flex items-center gap-1"><i data-feather="copy" class="w-3 h-3"></i> Copy Evidence</button>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        <div>DMARC Domain Checked: <strong class="font-mono text-gray-900">{{ data.auth_result.dmarc.domain_checked or 'N/A' }}</strong></div>
+                                        <div>Enforced Policy (p=): <strong class="font-mono text-gray-900 uppercase">{{ data.auth_result.dmarc.policy or 'none' }}</strong></div>
+                                    </div>
+                                    {% if data.auth_result.dmarc.raw_record %}
+                                        <div class="p-2.5 bg-white rounded-lg border border-gray-200 font-mono text-xs text-gray-800 break-all">Raw DNS DMARC TXT: {{ data.auth_result.dmarc.raw_record }}</div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- RULE 4: CONSOLIDATED Sender Domain Reputation (Typosquatting & Homograph Display Grouping) -->
+                        {% set sender_typo = data.domain_result.is_typosquat if data.domain_result else False %}
+                        {% set sender_hom = data.domain_result.is_homograph if data.domain_result else False %}
+                        {% set domain_rep_pts = (20 if sender_typo else 0) + (20 if sender_hom else 0) %}
+                        {% set domain_rep_flagged = sender_typo or sender_hom %}
+                        <tr class="audit-row transition-colors hover:bg-gray-50 cursor-pointer" data-category="Domain Intelligence" data-rule="Sender Domain Reputation" data-points="{{ domain_rep_pts }}" data-flagged="{{ 'true' if domain_rep_flagged else 'false' }}" onclick="toggleRow('drawer-dom-rep')">
+                            <td class="px-4 py-3.5 text-center text-gray-400">
+                                <i data-feather="chevron-right" id="arrow-drawer-dom-rep" class="w-4 h-4 transition-transform duration-200"></i>
+                            </td>
+                            <td class="px-4 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wider">Domain Intelligence</td>
+                            <td class="px-4 py-3.5 font-semibold text-gray-900 flex items-center gap-1.5">
+                                Sender Domain Reputation
+                                <span class="group relative cursor-help">
+                                    <i data-feather="info" class="w-3.5 h-3.5 text-gray-400 hover:text-brand"></i>
+                                    <span class="pointer-events-none absolute left-6 top-0 hidden w-64 rounded-lg bg-gray-900 p-2.5 text-xs font-normal text-white shadow-xl group-hover:block z-30">
+                                        Scans sender domain for typosquatting variations against 38+ major brands and Punycode/homograph attacks.
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5">
+                                {% if domain_rep_flagged %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-red-100 text-red-800 border border-red-200"><i data-feather="alert-circle" class="w-3 h-3"></i> Flagged ({{ "Typosquat " if sender_typo }}{{ "Homograph" if sender_hom }})</span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-green-100 text-green-800 border border-green-200"><i data-feather="check" class="w-3 h-3"></i> Clean</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-bold {% if domain_rep_pts > 0 %}text-red-600{% else %}text-gray-400{% endif %}">+{{ domain_rep_pts }}</td>
+                        </tr>
+                        <!-- Sender Domain Reputation Drawer -->
+                        <tr id="drawer-dom-rep" class="hidden bg-gray-50/80 border-t-0">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="space-y-3 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-gray-700 uppercase tracking-wider">Sender Domain Intelligence Breakdown</span>
+                                        <button type="button" onclick="event.stopPropagation(); copyText('Sender Domain Reputation:\nTyposquatting: {{ data.domain_result.typosquat_details or "Pass" }}\nHomograph: {{ data.domain_result.homograph_details or "Pass" }}')" class="text-brand hover:underline font-semibold flex items-center gap-1"><i data-feather="copy" class="w-3 h-3"></i> Copy Evidence</button>
+
+                                    </div>
+                                    {% if data.domain_result and data.domain_result.domain_breakdown %}
+                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                        <div class="p-2 bg-white rounded border border-gray-200"><span class="text-gray-500 font-bold block">Subdomain</span><span class="font-mono">{{ data.domain_result.domain_breakdown.subdomain or '(none)' }}</span></div>
+                                        <div class="p-2 bg-white rounded border border-gray-200"><span class="text-gray-500 font-bold block">Domain Label</span><span class="font-mono font-bold text-brand">{{ data.domain_result.domain_breakdown.domain }}</span></div>
+                                        <div class="p-2 bg-white rounded border border-gray-200"><span class="text-gray-500 font-bold block">TLD Suffix</span><span class="font-mono">{{ data.domain_result.domain_breakdown.suffix }}</span></div>
+                                        <div class="p-2 bg-white rounded border border-gray-200"><span class="text-gray-500 font-bold block">Registered Domain</span><span class="font-mono font-bold">{{ data.domain_result.domain_breakdown.registered_domain }}</span></div>
+                                    </div>
+                                    {% endif %}
+                                    <div class="space-y-1">
+                                        <div><strong>Typosquatting Check:</strong> {{ data.domain_result.typosquat_details or "Pass (Checked against 38+ brand domains)" }}</div>
+                                        <div><strong>Homograph / Punycode Check:</strong> {{ data.domain_result.homograph_details or "Pass (No Punycode xn-- or mixed scripts)" }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- RULE 5: Return-Path Domain Alignment -->
+                        {% set rp_item = None %}
+                        {% for item in data.risk_result.breakdown if item.rule_name == 'Return-Path Domain Alignment' %}{% set rp_item = item %}{% endfor %}
+                        {% set rp_pts = rp_item.points_added if rp_item else 0 %}
+                        {% set rp_state = rp_item.state if rp_item else 'Aligned' %}
+                        <tr class="audit-row transition-colors hover:bg-gray-50 cursor-pointer" data-category="Domain Intelligence" data-rule="Return-Path Domain Alignment" data-points="{{ rp_pts }}" data-flagged="{{ 'true' if rp_pts > 0 else 'false' }}" onclick="toggleRow('drawer-rp')">
+                            <td class="px-4 py-3.5 text-center text-gray-400">
+                                <i data-feather="chevron-right" id="arrow-drawer-rp" class="w-4 h-4 transition-transform duration-200"></i>
+                            </td>
+                            <td class="px-4 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wider">Domain Intelligence</td>
+                            <td class="px-4 py-3.5 font-semibold text-gray-900 flex items-center gap-1.5">
+                                Return-Path Alignment
+                                <span class="group relative cursor-help">
+                                    <i data-feather="info" class="w-3.5 h-3.5 text-gray-400 hover:text-brand"></i>
+                                    <span class="pointer-events-none absolute left-6 top-0 hidden w-64 rounded-lg bg-gray-900 p-2.5 text-xs font-normal text-white shadow-xl group-hover:block z-30">
+                                        Checks if envelope Return-Path domain matches the From header or uses a known ESP infrastructure.
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5">
+                                {% if 'known ESP' in rp_state %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200"><i data-feather="info" class="w-3 h-3"></i> Known ESP</span>
+                                {% elif 'Mismatch' in rp_state %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-amber-100 text-amber-800 border border-amber-200"><i data-feather="alert-triangle" class="w-3 h-3"></i> Mismatch</span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-green-100 text-green-800 border border-green-200"><i data-feather="check" class="w-3 h-3"></i> Aligned</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-bold {% if rp_pts > 0 %}text-red-600{% else %}text-gray-400{% endif %}">+{{ rp_pts }}</td>
+                        </tr>
+                        <!-- Return-Path Drawer -->
+                        <tr id="drawer-rp" class="hidden bg-gray-50/80 border-t-0">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-gray-700 uppercase tracking-wider">Return-Path Header Evidence</span>
+                                        <button type="button" onclick="event.stopPropagation(); copyText('Return-Path: {{ data.parsed_email.return_path }}\nFrom: {{ data.parsed_email.from_address }}\nDetails: {{ rp_state }}')" class="text-brand hover:underline font-semibold flex items-center gap-1"><i data-feather="copy" class="w-3 h-3"></i> Copy Evidence</button>
+                                    </div>
+                                    <div>Envelope Return-Path: <strong class="font-mono text-gray-900">{{ data.parsed_email.return_path or 'N/A' }}</strong></div>
+                                    <div>Header From Address: <strong class="font-mono text-gray-900">{{ data.parsed_email.from_address or 'N/A' }}</strong></div>
+                                    <div class="p-2.5 bg-white rounded-lg border border-gray-200 font-mono text-xs text-gray-800">{{ rp_state }}</div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- RULE 6: Reply-To Domain Alignment -->
+                        {% set reply_item = None %}
+                        {% for item in data.risk_result.breakdown if item.rule_name == 'Reply-To Domain Alignment' %}{% set reply_item = item %}{% endfor %}
+                        {% set reply_pts = reply_item.points_added if reply_item else 0 %}
+                        {% set reply_state = reply_item.state if reply_item else 'Aligned' %}
+                        <tr class="audit-row transition-colors hover:bg-gray-50 cursor-pointer" data-category="Domain Intelligence" data-rule="Reply-To Domain Alignment" data-points="{{ reply_pts }}" data-flagged="{{ 'true' if reply_pts > 0 else 'false' }}" onclick="toggleRow('drawer-reply')">
+                            <td class="px-4 py-3.5 text-center text-gray-400">
+                                <i data-feather="chevron-right" id="arrow-drawer-reply" class="w-4 h-4 transition-transform duration-200"></i>
+                            </td>
+                            <td class="px-4 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wider">Domain Intelligence</td>
+                            <td class="px-4 py-3.5 font-semibold text-gray-900 flex items-center gap-1.5">
+                                Reply-To Alignment
+                                <span class="group relative cursor-help">
+                                    <i data-feather="info" class="w-3.5 h-3.5 text-gray-400 hover:text-brand"></i>
+                                    <span class="pointer-events-none absolute left-6 top-0 hidden w-64 rounded-lg bg-gray-900 p-2.5 text-xs font-normal text-white shadow-xl group-hover:block z-30">
+                                        Checks if the Reply-To destination domain matches the From header domain to prevent response redirection.
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5">
+                                {% if 'Mismatch' in reply_state %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-amber-100 text-amber-800 border border-amber-200"><i data-feather="alert-triangle" class="w-3 h-3"></i> Mismatch</span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-green-100 text-green-800 border border-green-200"><i data-feather="check" class="w-3 h-3"></i> Aligned</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-bold {% if reply_pts > 0 %}text-red-600{% else %}text-gray-400{% endif %}">+{{ reply_pts }}</td>
+                        </tr>
+                        <!-- Reply-To Drawer -->
+                        <tr id="drawer-reply" class="hidden bg-gray-50/80 border-t-0">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-gray-700 uppercase tracking-wider">Reply-To Header Evidence</span>
+                                        <button type="button" onclick="event.stopPropagation(); copyText('Reply-To: {{ data.parsed_email.reply_to }}\nFrom: {{ data.parsed_email.from_address }}\nDetails: {{ reply_state }}')" class="text-brand hover:underline font-semibold flex items-center gap-1"><i data-feather="copy" class="w-3 h-3"></i> Copy Evidence</button>
+                                    </div>
+                                    <div>Reply-To Address: <strong class="font-mono text-gray-900">{{ data.parsed_email.reply_to or 'N/A' }}</strong></div>
+                                    <div>Header From Address: <strong class="font-mono text-gray-900">{{ data.parsed_email.from_address or 'N/A' }}</strong></div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- RULE 7: Link Brand Impersonation -->
+                        {% set brand_imp_item = None %}
+                        {% for item in data.risk_result.breakdown if item.rule_name == 'Link Brand Impersonation' %}{% set brand_imp_item = item %}{% endfor %}
+                        {% set brand_imp_pts = brand_imp_item.points_added if brand_imp_item else 0 %}
+                        {% set brand_imp_state = brand_imp_item.state if brand_imp_item else '0 links flagged' %}
+                        <tr class="audit-row transition-colors hover:bg-gray-50 cursor-pointer" data-category="URL Analysis" data-rule="Link Brand Impersonation" data-points="{{ brand_imp_pts }}" data-flagged="{{ 'true' if brand_imp_pts > 0 else 'false' }}" onclick="toggleRow('drawer-brand-imp')">
+                            <td class="px-4 py-3.5 text-center text-gray-400">
+                                <i data-feather="chevron-right" id="arrow-drawer-brand-imp" class="w-4 h-4 transition-transform duration-200"></i>
+                            </td>
+                            <td class="px-4 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wider">URL Analysis</td>
+                            <td class="px-4 py-3.5 font-semibold text-gray-900 flex items-center gap-1.5">
+                                Link Brand Impersonation
+                                <span class="group relative cursor-help">
+                                    <i data-feather="info" class="w-3.5 h-3.5 text-gray-400 hover:text-brand"></i>
+                                    <span class="pointer-events-none absolute left-6 top-0 hidden w-64 rounded-lg bg-gray-900 p-2.5 text-xs font-normal text-white shadow-xl group-hover:block z-30">
+                                        Identifies links where visible link text mentions a brand but the destination routes elsewhere.
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5">
+                                {% if brand_imp_pts > 0 %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-red-100 text-red-800 border border-red-200"><i data-feather="alert-circle" class="w-3 h-3"></i> {{ brand_imp_state }}</span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-green-100 text-green-800 border border-green-200"><i data-feather="check" class="w-3 h-3"></i> 0 Flagged</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-bold {% if brand_imp_pts > 0 %}text-red-600{% else %}text-gray-400{% endif %}">+{{ brand_imp_pts }}</td>
+                        </tr>
+                        <!-- Brand Impersonation Drawer -->
+                        <tr id="drawer-brand-imp" class="hidden bg-gray-50/80 border-t-0">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-gray-700 uppercase tracking-wider">Brand Impersonation Link Evidence</span>
+                                        <button type="button" onclick="event.stopPropagation(); copyText('Link Brand Impersonation: {{ brand_imp_state }}')" class="text-brand hover:underline font-semibold flex items-center gap-1"><i data-feather="copy" class="w-3 h-3"></i> Copy Evidence</button>
+                                    </div>
+                                    {% for link in data.url_result.links if link.is_brand_impersonation %}
+                                        <div class="p-2 bg-white rounded border border-gray-200">
+                                            <p>Text: <strong class="text-gray-900">{{ link.link_text }}</strong></p>
+                                            <p>Destination: <strong class="font-mono text-brand">{{ link.destination_url }}</strong></p>
+                                        </div>
+                                    {% else %}
+                                        <p class="text-gray-500 italic">No brand impersonation links detected.</p>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- RULE 8: Link Domain Mismatch -->
+                        {% set gen_mismatch_item = None %}
+                        {% for item in data.risk_result.breakdown if item.rule_name == 'Link Domain Mismatch' %}{% set gen_mismatch_item = item %}{% endfor %}
+                        {% set gen_mismatch_pts = gen_mismatch_item.points_added if gen_mismatch_item else 0 %}
+                        {% set gen_mismatch_state = gen_mismatch_item.state if gen_mismatch_item else '0 links flagged' %}
+                        <tr class="audit-row transition-colors hover:bg-gray-50 cursor-pointer" data-category="URL Analysis" data-rule="Link Domain Mismatch" data-points="{{ gen_mismatch_pts }}" data-flagged="{{ 'true' if gen_mismatch_pts > 0 else 'false' }}" onclick="toggleRow('drawer-link-mismatch')">
+                            <td class="px-4 py-3.5 text-center text-gray-400">
+                                <i data-feather="chevron-right" id="arrow-drawer-link-mismatch" class="w-4 h-4 transition-transform duration-200"></i>
+                            </td>
+                            <td class="px-4 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wider">URL Analysis</td>
+                            <td class="px-4 py-3.5 font-semibold text-gray-900 flex items-center gap-1.5">
+                                Link Domain Mismatch
+                                <span class="group relative cursor-help">
+                                    <i data-feather="info" class="w-3.5 h-3.5 text-gray-400 hover:text-brand"></i>
+                                    <span class="pointer-events-none absolute left-6 top-0 hidden w-64 rounded-lg bg-gray-900 p-2.5 text-xs font-normal text-white shadow-xl group-hover:block z-30">
+                                        Detects links where visible domain text contradicts the actual destination domain.
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5">
+                                {% if gen_mismatch_pts > 0 %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-red-100 text-red-800 border border-red-200"><i data-feather="alert-circle" class="w-3 h-3"></i> {{ gen_mismatch_state }}</span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-green-100 text-green-800 border border-green-200"><i data-feather="check" class="w-3 h-3"></i> 0 Flagged</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-bold {% if gen_mismatch_pts > 0 %}text-red-600{% else %}text-gray-400{% endif %}">+{{ gen_mismatch_pts }}</td>
+                        </tr>
+                        <!-- Link Mismatch Drawer -->
+                        <tr id="drawer-link-mismatch" class="hidden bg-gray-50/80 border-t-0">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-gray-700 uppercase tracking-wider">Domain Mismatch Link Evidence</span>
+                                        <button type="button" onclick="event.stopPropagation(); copyText('Link Domain Mismatch: {{ gen_mismatch_state }}')" class="text-brand hover:underline font-semibold flex items-center gap-1"><i data-feather="copy" class="w-3 h-3"></i> Copy Evidence</button>
+                                    </div>
+                                    {% for link in data.url_result.links if link.is_mismatch %}
+                                        <div class="p-2 bg-white rounded border border-gray-200">
+                                            <p>Text Domain: <strong class="text-gray-900">{{ link.link_text }}</strong></p>
+                                            <p>Actual Destination: <strong class="font-mono text-brand">{{ link.destination_url }}</strong></p>
+                                        </div>
+                                    {% else %}
+                                        <p class="text-gray-500 italic">No domain mismatch links detected.</p>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- RULE 9: Raw IP Link Destination -->
+                        {% set raw_ip_item = None %}
+                        {% for item in data.risk_result.breakdown if item.rule_name == 'Raw IP Link Destination' %}{% set raw_ip_item = item %}{% endfor %}
+                        {% set raw_ip_pts = raw_ip_item.points_added if raw_ip_item else 0 %}
+                        {% set raw_ip_state = raw_ip_item.state if raw_ip_item else '0 links flagged' %}
+                        <tr class="audit-row transition-colors hover:bg-gray-50 cursor-pointer" data-category="URL Analysis" data-rule="Raw IP Link Destination" data-points="{{ raw_ip_pts }}" data-flagged="{{ 'true' if raw_ip_pts > 0 else 'false' }}" onclick="toggleRow('drawer-raw-ip')">
+                            <td class="px-4 py-3.5 text-center text-gray-400">
+                                <i data-feather="chevron-right" id="arrow-drawer-raw-ip" class="w-4 h-4 transition-transform duration-200"></i>
+                            </td>
+                            <td class="px-4 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wider">URL Analysis</td>
+                            <td class="px-4 py-3.5 font-semibold text-gray-900 flex items-center gap-1.5">
+                                Raw IP Link Destination
+                                <span class="group relative cursor-help">
+                                    <i data-feather="info" class="w-3.5 h-3.5 text-gray-400 hover:text-brand"></i>
+                                    <span class="pointer-events-none absolute left-6 top-0 hidden w-64 rounded-lg bg-gray-900 p-2.5 text-xs font-normal text-white shadow-xl group-hover:block z-30">
+                                        Flags links pointing directly to IP addresses instead of registered domain names.
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5">
+                                {% if raw_ip_pts > 0 %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-red-100 text-red-800 border border-red-200"><i data-feather="alert-circle" class="w-3 h-3"></i> {{ raw_ip_state }}</span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-green-100 text-green-800 border border-green-200"><i data-feather="check" class="w-3 h-3"></i> 0 Flagged</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-bold {% if raw_ip_pts > 0 %}text-red-600{% else %}text-gray-400{% endif %}">+{{ raw_ip_pts }}</td>
+                        </tr>
+                        <!-- Raw IP Drawer -->
+                        <tr id="drawer-raw-ip" class="hidden bg-gray-50/80 border-t-0">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-gray-700 uppercase tracking-wider">Raw IP Destination Evidence</span>
+                                        <button type="button" onclick="event.stopPropagation(); copyText('Raw IP Links: {{ raw_ip_state }}')" class="text-brand hover:underline font-semibold flex items-center gap-1"><i data-feather="copy" class="w-3 h-3"></i> Copy Evidence</button>
+                                    </div>
+                                    {% for link in data.url_result.links if link.is_raw_ip %}
+                                        <div class="p-2 bg-white rounded border border-gray-200">
+                                            <p>Text: <strong class="text-gray-900">{{ link.link_text }}</strong></p>
+                                            <p>IP Target: <strong class="font-mono text-red-700">{{ link.destination_url }}</strong></p>
+                                        </div>
+                                    {% else %}
+                                        <p class="text-gray-500 italic">No raw IP destination links detected.</p>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- RULE 10: Destination Typosquat / Homograph -->
+                        {% set dest_typo_item = None %}
+                        {% for item in data.risk_result.breakdown if item.rule_name == 'Destination Typosquat/Homograph' %}{% set dest_typo_item = item %}{% endfor %}
+                        {% set dest_typo_pts = dest_typo_item.points_added if dest_typo_item else 0 %}
+                        {% set dest_typo_state = dest_typo_item.state if dest_typo_item else '0 links flagged' %}
+                        <tr class="audit-row transition-colors hover:bg-gray-50 cursor-pointer" data-category="URL Analysis" data-rule="Destination Typosquat/Homograph" data-points="{{ dest_typo_pts }}" data-flagged="{{ 'true' if dest_typo_pts > 0 else 'false' }}" onclick="toggleRow('drawer-dest-typo')">
+                            <td class="px-4 py-3.5 text-center text-gray-400">
+                                <i data-feather="chevron-right" id="arrow-drawer-dest-typo" class="w-4 h-4 transition-transform duration-200"></i>
+                            </td>
+                            <td class="px-4 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wider">URL Analysis</td>
+                            <td class="px-4 py-3.5 font-semibold text-gray-900 flex items-center gap-1.5">
+                                Destination Typosquat/Homograph
+                                <span class="group relative cursor-help">
+                                    <i data-feather="info" class="w-3.5 h-3.5 text-gray-400 hover:text-brand"></i>
+                                    <span class="pointer-events-none absolute left-6 top-0 hidden w-64 rounded-lg bg-gray-900 p-2.5 text-xs font-normal text-white shadow-xl group-hover:block z-30">
+                                        Analyzes destination link URLs for typosquatting or Punycode homographs.
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5">
+                                {% if dest_typo_pts > 0 %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-red-100 text-red-800 border border-red-200"><i data-feather="alert-circle" class="w-3 h-3"></i> {{ dest_typo_state }}</span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-green-100 text-green-800 border border-green-200"><i data-feather="check" class="w-3 h-3"></i> 0 Flagged</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-bold {% if dest_typo_pts > 0 %}text-red-600{% else %}text-gray-400{% endif %}">+{{ dest_typo_pts }}</td>
+                        </tr>
+                        <!-- Destination Typosquat Drawer -->
+                        <tr id="drawer-dest-typo" class="hidden bg-gray-50/80 border-t-0">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-gray-700 uppercase tracking-wider">Destination Typosquat/Homograph Evidence</span>
+                                        <button type="button" onclick="event.stopPropagation(); copyText('Destination Typosquat: {{ dest_typo_state }}')" class="text-brand hover:underline font-semibold flex items-center gap-1"><i data-feather="copy" class="w-3 h-3"></i> Copy Evidence</button>
+                                    </div>
+                                    {% for link in data.url_result.links if link.is_typosquat or link.is_homograph %}
+                                        <div class="p-2 bg-white rounded border border-gray-200">
+                                            <p>Destination: <strong class="font-mono text-red-700">{{ link.destination_url }}</strong></p>
+                                            <p>Details: {{ link.details }}</p>
+                                        </div>
+                                    {% else %}
+                                        <p class="text-gray-500 italic">No destination typosquatting or homograph links detected.</p>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- RULE 11: URL Shortener Present -->
+                        {% set shortener_item = None %}
+                        {% for item in data.risk_result.breakdown if item.rule_name == 'URL Shortener Present' %}{% set shortener_item = item %}{% endfor %}
+                        {% set shortener_pts = shortener_item.points_added if shortener_item else 0 %}
+                        {% set shortener_state = shortener_item.state if shortener_item else '0 links flagged' %}
+                        <tr class="audit-row transition-colors hover:bg-gray-50 cursor-pointer" data-category="URL Analysis" data-rule="URL Shortener Present" data-points="{{ shortener_pts }}" data-flagged="{{ 'true' if shortener_pts > 0 else 'false' }}" onclick="toggleRow('drawer-shortener')">
+                            <td class="px-4 py-3.5 text-center text-gray-400">
+                                <i data-feather="chevron-right" id="arrow-drawer-shortener" class="w-4 h-4 transition-transform duration-200"></i>
+                            </td>
+                            <td class="px-4 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wider">URL Analysis</td>
+                            <td class="px-4 py-3.5 font-semibold text-gray-900 flex items-center gap-1.5">
+                                URL Shortener Present
+                                <span class="group relative cursor-help">
+                                    <i data-feather="info" class="w-3.5 h-3.5 text-gray-400 hover:text-brand"></i>
+                                    <span class="pointer-events-none absolute left-6 top-0 hidden w-64 rounded-lg bg-gray-900 p-2.5 text-xs font-normal text-white shadow-xl group-hover:block z-30">
+                                        Identifies links using URL shortening services that conceal actual target destinations.
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5">
+                                {% if shortener_pts > 0 %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-amber-100 text-amber-800 border border-amber-200"><i data-feather="alert-triangle" class="w-3 h-3"></i> {{ shortener_state }}</span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-green-100 text-green-800 border border-green-200"><i data-feather="check" class="w-3 h-3"></i> 0 Flagged</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-bold {% if shortener_pts > 0 %}text-red-600{% else %}text-gray-400{% endif %}">+{{ shortener_pts }}</td>
+                        </tr>
+                        <!-- Shortener Drawer -->
+                        <tr id="drawer-shortener" class="hidden bg-gray-50/80 border-t-0">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-gray-700 uppercase tracking-wider">URL Shortener Evidence</span>
+                                        <button type="button" onclick="event.stopPropagation(); copyText('URL Shorteners: {{ shortener_state }}')" class="text-brand hover:underline font-semibold flex items-center gap-1"><i data-feather="copy" class="w-3 h-3"></i> Copy Evidence</button>
+                                    </div>
+                                    {% for link in data.url_result.links if link.is_shortened %}
+                                        <div class="p-2 bg-white rounded border border-gray-200">
+                                            <p>Shortened Link: <strong class="font-mono text-brand">{{ link.destination_url }}</strong></p>
+                                        </div>
+                                    {% else %}
+                                        <p class="text-gray-500 italic">No URL shortener links detected.</p>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- RULE 12: CONSOLIDATED Attachment Threat Analysis (Signature Mismatch, Dangerous Ext, Double Ext Display Grouping) -->
+                        {% set att_mismatch_item = None %}
+                        {% set att_danger_item = None %}
+                        {% set att_double_item = None %}
+                        {% for item in data.risk_result.breakdown if item.rule_name == 'Attachment Signature Mismatch' %}{% set att_mismatch_item = item %}{% endfor %}
+                        {% for item in data.risk_result.breakdown if item.rule_name == 'Attachment Dangerous Extension' %}{% set att_danger_item = item %}{% endfor %}
+                        {% for item in data.risk_result.breakdown if item.rule_name == 'Attachment Double Extension' %}{% set att_double_item = item %}{% endfor %}
+                        {% set att_total_pts = (att_mismatch_item.points_added if att_mismatch_item else 0) + (att_danger_item.points_added if att_danger_item else 0) + (att_double_item.points_added if att_double_item else 0) %}
+                        {% set att_suspicious_count = data.attachment_result.suspicious_attachments_count if data.attachment_result else 0 %}
+                        <tr class="audit-row transition-colors hover:bg-gray-50 cursor-pointer" data-category="Attachment Analysis" data-rule="Attachment Threat Analysis" data-points="{{ att_total_pts }}" data-flagged="{{ 'true' if att_total_pts > 0 else 'false' }}" onclick="toggleRow('drawer-att-threat')">
+                            <td class="px-4 py-3.5 text-center text-gray-400">
+                                <i data-feather="chevron-right" id="arrow-drawer-att-threat" class="w-4 h-4 transition-transform duration-200"></i>
+                            </td>
+                            <td class="px-4 py-3.5 text-xs font-bold text-gray-500 uppercase tracking-wider">Attachment Analysis</td>
+                            <td class="px-4 py-3.5 font-semibold text-gray-900 flex items-center gap-1.5">
+                                Attachment Threat Analysis
+                                <span class="group relative cursor-help">
+                                    <i data-feather="info" class="w-3.5 h-3.5 text-gray-400 hover:text-brand"></i>
+                                    <span class="pointer-events-none absolute left-6 top-0 hidden w-64 rounded-lg bg-gray-900 p-2.5 text-xs font-normal text-white shadow-xl group-hover:block z-30">
+                                        Evaluates attached files for MIME magic byte signature mismatches, dangerous extensions, and double extension tricks.
+                                    </span>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3.5">
+                                {% if att_total_pts > 0 %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-red-100 text-red-800 border border-red-200"><i data-feather="alert-triangle" class="w-3 h-3"></i> {{ att_suspicious_count }} files flagged</span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-green-100 text-green-800 border border-green-200"><i data-feather="check" class="w-3 h-3"></i> Pass (0 flagged)</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-bold {% if att_total_pts > 0 %}text-red-600{% else %}text-gray-400{% endif %}">+{{ att_total_pts }}</td>
+                        </tr>
+                        <!-- Attachment Threat Drawer -->
+                        <tr id="drawer-att-threat" class="hidden bg-gray-50/80 border-t-0">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="space-y-3 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-gray-700 uppercase tracking-wider">Attachment Forensic Breakdown</span>
+                                        <button type="button" onclick="event.stopPropagation(); copyText('Attachment Threat Analysis: {{ att_suspicious_count }} suspicious files detected')" class="text-brand hover:underline font-semibold flex items-center gap-1"><i data-feather="copy" class="w-3 h-3"></i> Copy Evidence</button>
+                                    </div>
+                                    {% if data.attachment_result and data.attachment_result.attachments %}
+                                        <div class="space-y-2">
+                                            {% for att in data.attachment_result.attachments %}
+                                                <div class="p-2.5 bg-white rounded border border-gray-200">
+                                                    <div class="font-bold text-gray-900">{{ att.filename }} ({{ att.size }} bytes)</div>
+                                                    <div>Claimed Ext: <span class="font-mono">{{ att.claimed_extension }}</span> &bull; Detected MIME: <span class="font-mono text-brand">{{ att.detected_mime }}</span></div>
+                                                    {% if att.flags %}
+                                                        <div class="text-red-700 font-semibold mt-1">Flags: {{ att.flags|join(', ') }}</div>
+                                                    {% else %}
+                                                        <div class="text-green-700 font-semibold mt-1">Clean attachment</div>
+                                                    {% endif %}
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <p class="text-gray-500 italic">No attachments found in this email.</p>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Reputation Intelligence (Beta) Section -->
+    <div class="bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 rounded-2xl shadow-lg border border-purple-800/40 p-6 text-white mb-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div>
+                <div class="flex items-center gap-2 mb-1">
+                    <i data-feather="globe" class="w-5 h-5 text-purple-400"></i>
+                    <h2 class="text-lg font-bold text-white tracking-wide">Live Reputation Intelligence</h2>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase tracking-wider">Beta — Live APIs</span>
+                </div>
+                <p class="text-xs text-purple-200/80">Real-time threat intelligence layer querying external APIs (VirusTotal & AbuseIPDB). Core offline analysis remains 100% independent of API availability.</p>
+            </div>
+            <div class="text-xs text-purple-300/70 font-mono bg-purple-950/60 px-3 py-1.5 rounded-lg border border-purple-800/40">
+                Rate-Limited & Fail-Safe
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- VirusTotal URL Reputation Card -->
+            <div class="bg-slate-800/80 rounded-xl p-5 border border-purple-700/30 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <i data-feather="shield-off" class="w-4 h-4 text-purple-400"></i>
+                            <h3 class="font-bold text-sm text-white">VirusTotal URL Intelligence</h3>
+                        </div>
+                        <a href="https://www.virustotal.com" target="_blank" rel="noopener noreferrer" class="text-[11px] text-purple-300 hover:text-white underline flex items-center gap-1">
+                            Data from VirusTotal.com <i data-feather="external-link" class="w-3 h-3"></i>
+                        </a>
+                    </div>
+
+                    {% set vt = data.reputation_result.virustotal if data.reputation_result else None %}
+                    {% if vt and vt.is_configured %}
+                        <div class="mb-3 p-3 rounded-lg bg-slate-900/90 border border-purple-900/50">
+                            <div class="flex items-center justify-between text-xs mb-1">
+                                <span class="text-gray-400 font-medium">Scan Status:</span>
+                                <span class="font-bold text-purple-200">{{ vt.status }}</span>
+                            </div>
+                            {% if vt.disclosure_note %}
+                                <p class="text-[11px] text-purple-300/80 italic mt-1">{{ vt.disclosure_note }}</p>
+                            {% endif %}
+                        </div>
+
+                        <div class="space-y-2 text-xs max-h-48 overflow-y-auto pr-1">
+                            {% for item in vt.urls_checked %}
+                                <div class="p-2.5 rounded bg-slate-900/60 border border-slate-700/50 flex flex-col gap-1">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="font-mono text-purple-300 font-semibold truncate text-[11px]">{{ item.domain }}</span>
+                                        {% if item.malicious_count + item.suspicious_count > 0 %}
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-red-900/80 text-red-200 border border-red-700">{{ item.status }}</span>
+                                        {% elif item.is_scanned %}
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-green-900/80 text-green-200 border border-green-700">{{ item.status }}</span>
+                                        {% else %}
+                                            <span class="px-2 py-0.5 rounded text-[10px] text-gray-400 bg-slate-800 border border-slate-700">{{ item.status }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <span class="font-mono text-[10px] text-gray-400 truncate">{{ item.url }}</span>
+                                </div>
+                            {% else %}
+                                <p class="text-xs text-gray-400 italic">No URLs were inspected by VirusTotal.</p>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="p-4 rounded-lg bg-slate-900/60 border border-slate-700/50 text-center text-xs text-gray-400">
+                            <i data-feather="lock" class="w-5 h-5 text-gray-500 mx-auto mb-2"></i>
+                            <p class="font-semibold text-gray-300">Reputation check not configured</p>
+                            <p class="text-[11px] text-gray-400 mt-1">Set <code class="text-purple-300 bg-slate-800 px-1 py-0.5 rounded">VIRUSTOTAL_API_KEY</code> in <code class="text-purple-300 bg-slate-800 px-1 py-0.5 rounded">.env</code> to enable live URL scanning.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- AbuseIPDB IP Reputation Card -->
+            <div class="bg-slate-800/80 rounded-xl p-5 border border-purple-700/30 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <i data-feather="activity" class="w-4 h-4 text-purple-400"></i>
+                            <h3 class="font-bold text-sm text-white">AbuseIPDB Originating IP Intelligence</h3>
+                        </div>
+                        <a href="https://www.abuseipdb.com" target="_blank" rel="noopener noreferrer" class="text-[11px] text-purple-300 hover:text-white underline flex items-center gap-1">
+                            Data from AbuseIPDB.com <i data-feather="external-link" class="w-3 h-3"></i>
+                        </a>
+                    </div>
+
+                    {% set abuse = data.reputation_result.abuseipdb if data.reputation_result else None %}
+                    {% if abuse and abuse.is_configured %}
+                        <div class="mb-3 p-3 rounded-lg bg-slate-900/90 border border-purple-900/50">
+                            <div class="flex items-center justify-between text-xs mb-1">
+                                <span class="text-gray-400 font-medium">IP Checked:</span>
+                                <span class="font-mono font-bold text-purple-200">{{ abuse.ip_checked or 'N/A' }}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs mt-2">
+                                <span class="text-gray-400 font-medium">Abuse Confidence Score:</span>
+                                {% if abuse.abuse_confidence_score is not none %}
+                                    {% if abuse.abuse_confidence_score >= 75 %}
+                                        <span class="px-2.5 py-0.5 rounded text-xs font-extrabold bg-red-900 text-red-200 border border-red-700">{{ abuse.abuse_confidence_score }}% (High Threat)</span>
+                                    {% elif abuse.abuse_confidence_score >= 25 %}
+                                        <span class="px-2.5 py-0.5 rounded text-xs font-extrabold bg-amber-900 text-amber-200 border border-amber-700">{{ abuse.abuse_confidence_score }}% (Medium Risk)</span>
+                                    {% else %}
+                                        <span class="px-2.5 py-0.5 rounded text-xs font-extrabold bg-green-900 text-green-200 border border-green-700">{{ abuse.abuse_confidence_score }}% (Clean / Safe)</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-gray-400">N/A</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 text-xs">
+                            <div class="grid grid-cols-2 gap-2 text-[11px]">
+                                <div class="p-2 rounded bg-slate-900/60 border border-slate-700/50">
+                                    <span class="text-gray-400 block text-[10px]">ISP</span>
+                                    <span class="font-semibold text-gray-200 truncate block">{{ abuse.isp or 'N/A' }}</span>
+                                </div>
+                                <div class="p-2 rounded bg-slate-900/60 border border-slate-700/50">
+                                    <span class="text-gray-400 block text-[10px]">Country Code</span>
+                                    <span class="font-semibold text-gray-200 block">{{ abuse.country_code or 'N/A' }}</span>
+                                </div>
+                                <div class="p-2 rounded bg-slate-900/60 border border-slate-700/50">
+                                    <span class="text-gray-400 block text-[10px]">Total Abuse Reports</span>
+                                    <span class="font-semibold text-gray-200 block">{{ abuse.total_reports or 0 }}</span>
+                                </div>
+                                <div class="p-2 rounded bg-slate-900/60 border border-slate-700/50">
+                                    <span class="text-gray-400 block text-[10px]">Cache Status</span>
+                                    <span class="font-semibold text-purple-300 block">{{ 'Cached (24h TTL)' if abuse.is_cached else 'Live Query' }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="p-4 rounded-lg bg-slate-900/60 border border-slate-700/50 text-center text-xs text-gray-400">
+                            <i data-feather="lock" class="w-5 h-5 text-gray-500 mx-auto mb-2"></i>
+                            <p class="font-semibold text-gray-300">Reputation check not configured</p>
+                            <p class="text-[11px] text-gray-400 mt-1">Set <code class="text-purple-300 bg-slate-800 px-1 py-0.5 rounded">ABUSEIPDB_API_KEY</code> in <code class="text-purple-300 bg-slate-800 px-1 py-0.5 rounded">.env</code> to enable live IP reputation queries.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header Summary Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+
+        <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <i data-feather="mail" class="w-5 h-5 text-brand"></i> Email Envelope & Header Summary
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div class="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <span class="text-xs font-bold text-gray-500 uppercase block mb-1">From Display Name & Address</span>
+                <p class="font-semibold text-gray-900">{{ data.parsed_email.from_name or '(None)' }}</p>
+                <p class="text-xs font-mono text-brand">{{ data.parsed_email.from_address or '(None)' }}</p>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <span class="text-xs font-bold text-gray-500 uppercase block mb-1">Recipient (To)</span>
+                <p class="font-semibold text-gray-900 truncate">{{ data.parsed_email.to or '(None)' }}</p>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-xl border border-gray-100 col-span-1 md:col-span-2">
+                <span class="text-xs font-bold text-gray-500 uppercase block mb-1">Subject</span>
+                <p class="font-bold text-gray-900 text-base">{{ data.parsed_email.subject or '(No Subject)' }}</p>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <span class="text-xs font-bold text-gray-500 uppercase block mb-1">Date Header</span>
+                <p class="font-mono text-xs text-gray-800">{{ data.parsed_email.date or '(None)' }}</p>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <span class="text-xs font-bold text-gray-500 uppercase block mb-1">Message-ID</span>
+                <p class="font-mono text-xs text-gray-800 truncate">{{ data.parsed_email.message_id or '(None)' }}</p>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <span class="text-xs font-bold text-gray-500 uppercase block mb-1">Return-Path</span>
+                <p class="font-mono text-xs text-gray-800">{{ data.parsed_email.return_path or '(None)' }}</p>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <span class="text-xs font-bold text-gray-500 uppercase block mb-1">Reply-To</span>
+                <p class="font-mono text-xs text-gray-800">{{ data.parsed_email.reply_to or '(None)' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Authentication Card (SPF, DKIM, DMARC) -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <i data-feather="shield-check" class="w-5 h-5 text-brand"></i> Authentication Validation (SPF / DKIM / DMARC)
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <!-- SPF Card -->
+            <div class="p-5 rounded-xl border {% if data.auth_result.spf.status == 'Pass' %}bg-green-50/50 border-green-200{% elif data.auth_result.spf.status == 'SoftFail' %}bg-amber-50/50 border-amber-200{% elif 'Unable to verify' in data.auth_result.spf.status or data.auth_result.spf.status in ('None', 'TempError', 'PermError') %}bg-slate-50 border-slate-200{% else %}bg-red-50/50 border-red-200{% endif %}">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-gray-600">SPF Validation</span>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold {% if data.auth_result.spf.status == 'Pass' %}bg-green-100 text-green-800{% elif data.auth_result.spf.status == 'SoftFail' %}bg-amber-100 text-amber-800{% elif 'Unable to verify' in data.auth_result.spf.status or data.auth_result.spf.status in ('None', 'TempError', 'PermError') %}bg-slate-100 text-slate-800 border border-slate-300{% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ data.auth_result.spf.status }}
+                    </span>
+                </div>
+                <p class="text-xs text-gray-600 mt-1">Connecting IP: <span class="font-mono font-bold">{{ data.auth_result.spf.ip_used or 'Not available' }}</span></p>
+                <p class="text-xs text-gray-600 mt-1">Domain Checked: <span class="font-mono font-bold">{{ data.auth_result.spf.domain_checked or 'Not available' }}</span></p>
+                {% if data.auth_result.spf.raw_record %}
+                <details class="mt-3 text-xs">
+                    <summary class="cursor-pointer font-medium text-brand hover:underline">View Raw SPF TXT Record</summary>
+                    <div class="mt-2 p-2 bg-white rounded border border-gray-200 font-mono text-xs break-all">
+                        {{ data.auth_result.spf.raw_record }}
+                    </div>
+                </details>
+                {% endif %}
+            </div>
+
+            <!-- DKIM Card -->
+            <div class="p-5 rounded-xl border {% if data.auth_result.dkim.status == 'Pass' %}bg-green-50/50 border-green-200{% elif data.auth_result.dkim.status == 'Missing' %}bg-amber-50/50 border-amber-200{% elif 'Unable to verify' in data.auth_result.dkim.status %}bg-slate-50 border-slate-200{% else %}bg-red-50/50 border-red-200{% endif %}">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-gray-600">DKIM Validation</span>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold {% if data.auth_result.dkim.status == 'Pass' %}bg-green-100 text-green-800{% elif data.auth_result.dkim.status == 'Missing' %}bg-amber-100 text-amber-800{% elif 'Unable to verify' in data.auth_result.dkim.status %}bg-slate-100 text-slate-800 border border-slate-300{% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ data.auth_result.dkim.status }}
+                    </span>
+                </div>
+                <p class="text-xs text-gray-600 mt-1">Signing Domain: <span class="font-mono font-bold">{{ data.auth_result.dkim.domain_checked or 'Not available' }}</span></p>
+                <p class="text-xs text-gray-600 mt-1">Selector: <span class="font-mono font-bold">{{ data.auth_result.dkim.selector or 'Not available' }}</span></p>
+                {% if data.auth_result.dkim.reason %}
+                    <p class="text-xs text-gray-500 mt-2 italic">{{ data.auth_result.dkim.reason }}</p>
+                {% endif %}
+            </div>
+
+            <!-- DMARC Card -->
+            <div class="p-5 rounded-xl border {% if data.auth_result.dmarc.status == 'Pass' %}bg-green-50/50 border-green-200{% elif data.auth_result.dmarc.status == 'None' %}bg-amber-50/50 border-amber-200{% elif 'Unable to verify' in data.auth_result.dmarc.status %}bg-slate-50 border-slate-200{% else %}bg-red-50/50 border-red-200{% endif %}">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-gray-600">DMARC Validation</span>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold {% if data.auth_result.dmarc.status == 'Pass' %}bg-green-100 text-green-800{% elif data.auth_result.dmarc.status == 'None' %}bg-amber-100 text-amber-800{% elif 'Unable to verify' in data.auth_result.dmarc.status %}bg-slate-100 text-slate-800 border border-slate-300{% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ data.auth_result.dmarc.status }}
+                    </span>
+                </div>
+                <p class="text-xs text-gray-600 mt-1">Domain Checked: <span class="font-mono font-bold">{{ data.auth_result.dmarc.domain_checked or 'Not available' }}</span></p>
+                <p class="text-xs text-gray-600 mt-1">Enforced Policy (p=): <span class="font-mono font-bold uppercase">{{ data.auth_result.dmarc.policy or 'none' }}</span></p>
+                {% if data.auth_result.dmarc.raw_record %}
+                <details class="mt-3 text-xs">
+                    <summary class="cursor-pointer font-medium text-brand hover:underline">View Raw DMARC TXT Record</summary>
+                    <div class="mt-2 p-2 bg-white rounded border border-gray-200 font-mono text-xs break-all">
+                        {{ data.auth_result.dmarc.raw_record }}
+                    </div>
+                </details>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Domain Intelligence Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <i data-feather="globe" class="w-5 h-5 text-brand"></i> Domain Intelligence & Impersonation Check
+        </h2>
+
+        {% if data.domain_result and data.domain_result.domain_breakdown %}
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm mb-6">
+            <div class="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <span class="text-xs text-gray-500 font-bold uppercase block">Subdomain</span>
+                <span class="font-mono font-semibold text-gray-900">{{ data.domain_result.domain_breakdown.subdomain or '(none)' }}</span>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <span class="text-xs text-gray-500 font-bold uppercase block">Domain Label</span>
+                <span class="font-mono font-bold text-brand">{{ data.domain_result.domain_breakdown.domain }}</span>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <span class="text-xs text-gray-500 font-bold uppercase block">Public Suffix (TLD)</span>
+                <span class="font-mono font-semibold text-gray-900">{{ data.domain_result.domain_breakdown.suffix }}</span>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <span class="text-xs text-gray-500 font-bold uppercase block">Registered Domain</span>
+                <span class="font-mono font-bold text-gray-900">{{ data.domain_result.domain_breakdown.registered_domain }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Typosquatting Flag -->
+            <div class="p-4 rounded-xl border {% if data.domain_result.is_typosquat %}bg-red-50 border-red-200{% else %}bg-gray-50 border-gray-200{% endif %}">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold uppercase text-gray-700">Sender Typosquatting Check</span>
+                    <span class="text-xs font-extrabold px-2 py-0.5 rounded-full {% if data.domain_result.is_typosquat %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
+                        {{ "FLAGGED" if data.domain_result.is_typosquat else "PASS" }}
+                    </span>
+                </div>
+                {% if data.domain_result.is_typosquat %}
+                    <p class="text-xs text-red-700 font-semibold mt-2">{{ data.domain_result.typosquat_details }}</p>
+                {% else %}
+                    <p class="text-xs text-gray-500 mt-1">Checked against 38 known brand domains in curated brand list.</p>
+                {% endif %}
+            </div>
+
+            <!-- Homograph / Punycode Flag -->
+            <div class="p-4 rounded-xl border {% if data.domain_result.is_homograph %}bg-red-50 border-red-200{% else %}bg-gray-50 border-gray-200{% endif %}">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold uppercase text-gray-700">Homograph / Punycode Check</span>
+                    <span class="text-xs font-extrabold px-2 py-0.5 rounded-full {% if data.domain_result.is_homograph %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
+                        {{ "FLAGGED" if data.domain_result.is_homograph else "PASS" }}
+                    </span>
+                </div>
+                {% if data.domain_result.is_homograph %}
+                    <p class="text-xs text-red-700 font-semibold mt-2">{{ data.domain_result.homograph_details }}</p>
+                {% else %}
+                    <p class="text-xs text-gray-500 mt-1">No Punycode (xn--) or mixed-script homographs detected.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-600 flex items-center gap-2">
+            <i data-feather="info" class="w-4 h-4 text-gray-500 flex-shrink-0"></i>
+            <span><strong>Detection Note:</strong> Similarity-based check against curated brand list — not a guarantee of impersonation.</span>
+        </div>
+    </div>
+
+    <!-- URL & Link Analysis Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <i data-feather="link" class="w-5 h-5 text-brand"></i> Extracted URLs & Link Analysis
+            </h2>
+            <span class="text-xs font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-full">
+                {{ data.url_result.total_links }} Total Links &bull; {{ data.url_result.suspicious_links_count }} Suspicious
+            </span>
+        </div>
+
+        {% if not data.url_result.links %}
+            <p class="text-sm text-gray-500 italic p-4 bg-gray-50 rounded-xl text-center">No URLs or hyperlinks were extracted from this email.</p>
+        {% else %}
+            <div class="overflow-x-auto border border-gray-200 rounded-xl">
+                <table class="w-full text-left text-sm text-gray-600">
+                    <thead class="bg-gray-50 text-xs text-gray-500 uppercase border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3">Visible Link Text</th>
+                            <th class="px-4 py-3">Actual Destination URL</th>
+                            <th class="px-4 py-3">Analysis Flags</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for link in data.url_result.links %}
+                        <tr class="{% if link.is_mismatch or link.is_brand_impersonation or link.is_raw_ip or link.is_shortened or link.is_typosquat or link.is_homograph %}bg-red-50/20{% else %}bg-white{% endif %}">
+                            <td class="px-4 py-3 font-medium text-gray-900 max-w-xs truncate" title="{{ link.link_text }}">
+                                {{ link.link_text }}
+                            </td>
+                            <td class="px-4 py-3 font-mono text-xs text-brand max-w-xs truncate" title="{{ link.destination_url }}">
+                                {{ link.destination_url }}
+                            </td>
+                            <td class="px-4 py-3 text-xs">
+                                {% if link.flags %}
+                                    <div class="space-y-1">
+                                        {% for flag in link.flags %}
+                                            {% if "known ESP tracking domain" in flag %}
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                                                    <i data-feather="info" class="w-3 h-3 flex-shrink-0"></i> {{ flag }}
+                                                </span>
+                                            {% else %}
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800">
+                                                    <i data-feather="alert-circle" class="w-3 h-3 flex-shrink-0"></i> {{ flag }}
+                                                </span>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-green-700 font-semibold inline-flex items-center gap-1">
+                                        <i data-feather="check" class="w-3 h-3"></i> Clean
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Attachment Risk Analysis Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <i data-feather="paperclip" class="w-5 h-5 text-brand"></i> Attachment Risk Analysis
+            </h2>
+            <span class="text-xs font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-full">
+                {{ data.attachment_result.total_attachments if data.attachment_result else 0 }} Attachments &bull; {{ data.attachment_result.suspicious_attachments_count if data.attachment_result else 0 }} Suspicious
+            </span>
+        </div>
+
+        {% if not data.attachment_result or not data.attachment_result.attachments %}
+            <p class="text-sm text-gray-500 italic p-4 bg-gray-50 rounded-xl text-center">No attachments found in this email.</p>
+        {% else %}
+            <div class="overflow-x-auto border border-gray-200 rounded-xl">
+                <table class="w-full text-left text-sm text-gray-600">
+                    <thead class="bg-gray-50 text-xs text-gray-500 uppercase border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3">Filename & Size</th>
+                            <th class="px-4 py-3">Claimed Ext</th>
+                            <th class="px-4 py-3">Detected MIME Type (Magic Bytes)</th>
+                            <th class="px-4 py-3">Risk Flags & Analysis</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for att in data.attachment_result.attachments %}
+                        <tr class="{% if att.flags %}bg-red-50/20{% else %}bg-white{% endif %}">
+                            <td class="px-4 py-3 font-medium text-gray-900">
+                                <div class="font-semibold">{{ att.filename }}</div>
+                                <div class="text-xs font-mono text-gray-500">{{ att.size }} bytes</div>
+                                {% if att.size_sanity_note %}
+                                    <div class="text-xs text-amber-700 font-mono mt-0.5">{{ att.size_sanity_note }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 font-mono text-xs text-gray-800">
+                                {{ att.claimed_extension }}
+                            </td>
+                            <td class="px-4 py-3 font-mono text-xs text-brand">
+                                {{ att.detected_mime }}
+                            </td>
+                            <td class="px-4 py-3 text-xs">
+                                {% if att.flags %}
+                                    <div class="space-y-1">
+                                        {% for flag in att.flags %}
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800">
+                                                <i data-feather="alert-triangle" class="w-3 h-3 flex-shrink-0"></i> {{ flag }}
+                                            </span>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-green-700 font-semibold inline-flex items-center gap-1">
+                                        <i data-feather="check" class="w-3 h-3"></i> Clean
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Disclosed Routing Hops Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div class="mb-4">
+            <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <i data-feather="git-commit" class="w-5 h-5 text-gray-600"></i> Disclosed Received Routing Hops
+            </h2>
+            <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 mt-2 flex items-start gap-2">
+                <i data-feather="info" class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5"></i>
+                <div>
+                    <strong>Manual Review Recommended:</strong> These hops represent raw disclosed server headers extracted from top to bottom. They are shown as disclosed raw evidence and are not automatically scored.
+                </div>
+            </div>
+        </div>
+
+        {% if not data.parsed_email.received_headers %}
+            <p class="text-sm text-gray-500 italic p-4 bg-gray-50 rounded-xl text-center">No Received: routing headers found in email (Unable to determine hop path).</p>
+        {% else %}
+            <div class="space-y-2">
+                {% for hop in data.parsed_email.received_headers %}
+                <div class="p-3 bg-gray-50 rounded-xl border border-gray-200 font-mono text-xs text-gray-800 break-all">
+                    <span class="text-brand font-bold">Hop #{{ loop.index }}:</span> {{ hop or 'Unknown / Not available' }}
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- Client-Side JavaScript Controller for Views, Search, Filter, Sort, Expand, & Copy -->
+<script>
+    let filterMode = 'all'; // 'all' or 'flagged'
+
+    function showView(mode) {
+        const simpleView = document.getElementById('simple-summary-view');
+        const fullView = document.getElementById('full-audit-view');
+        const btnSimple = document.getElementById('btn-simple-summary');
+        const btnFull = document.getElementById('btn-full-audit');
+
+        if (mode === 'simple') {
+            simpleView.classList.remove('hidden');
+            fullView.classList.add('hidden');
+            btnSimple.className = "px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm bg-white text-gray-900 flex items-center gap-2 border border-gray-200";
+            btnFull.className = "px-5 py-2.5 rounded-xl font-bold text-sm transition-all text-gray-600 hover:text-gray-900 flex items-center gap-2";
+        } else {
+            simpleView.classList.add('hidden');
+            fullView.classList.remove('hidden');
+            btnFull.className = "px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm bg-white text-gray-900 flex items-center gap-2 border border-gray-200";
+            btnSimple.className = "px-5 py-2.5 rounded-xl font-bold text-sm transition-all text-gray-600 hover:text-gray-900 flex items-center gap-2";
+        }
+        if (window.feather) feather.replace();
+    }
+
+    function toggleRow(drawerId) {
+        const drawer = document.getElementById(drawerId);
+        const arrow = document.getElementById('arrow-' + drawerId);
+        if (!drawer) return;
+
+        if (drawer.classList.contains('hidden')) {
+            drawer.classList.remove('hidden');
+            if (arrow) arrow.style.transform = 'rotate(90deg)';
+        } else {
+            drawer.classList.add('hidden');
+            if (arrow) arrow.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    function setFilterMode(mode) {
+        filterMode = mode;
+        const btnAll = document.getElementById('filter-all-btn');
+        const btnFlagged = document.getElementById('filter-flagged-btn');
+
+        if (mode === 'all') {
+            btnAll.className = "px-2.5 py-1 rounded font-bold bg-white text-gray-900 shadow-xs";
+            btnFlagged.className = "px-2.5 py-1 rounded font-bold text-gray-600 hover:text-gray-900";
+        } else {
+            btnFlagged.className = "px-2.5 py-1 rounded font-bold bg-white text-gray-900 shadow-xs";
+            btnAll.className = "px-2.5 py-1 rounded font-bold text-gray-600 hover:text-gray-900";
+        }
+        filterAuditTrail();
+    }
+
+    function filterAuditTrail() {
+        const query = (document.getElementById('rule-search').value || '').toLowerCase();
+        const rows = document.querySelectorAll('.audit-row');
+
+        rows.forEach(row => {
+            const ruleName = (row.getAttribute('data-rule') || '').toLowerCase();
+            const category = (row.getAttribute('data-category') || '').toLowerCase();
+            const isFlagged = row.getAttribute('data-flagged') === 'true';
+            const drawerId = row.getAttribute('onclick') ? row.getAttribute('onclick').replace("toggleRow('", "").replace("')", "") : null;
+            const drawer = drawerId ? document.getElementById(drawerId) : null;
+
+            let matchesSearch = ruleName.includes(query) || category.includes(query);
+            let matchesFilter = (filterMode === 'all') || (filterMode === 'flagged' && isFlagged);
+
+            if (matchesSearch && matchesFilter) {
+                row.classList.remove('hidden');
+            } else {
+                row.classList.add('hidden');
+                if (drawer) drawer.classList.add('hidden');
+            }
+        });
+    }
+
+    function sortAuditTrail() {
+        const sortVal = document.getElementById('rule-sort').value;
+        const tbody = document.getElementById('audit-table-body');
+        const rows = Array.from(tbody.querySelectorAll('.audit-row'));
+
+        if (sortVal === 'default') {
+            // Reload page or reset to initial order
+            location.reload();
+            return;
+        }
+
+        rows.sort((a, b) => {
+            const ptsA = parseInt(a.getAttribute('data-points') || '0', 10);
+            const ptsB = parseInt(b.getAttribute('data-points') || '0', 10);
+            if (sortVal === 'points-desc') return ptsB - ptsA;
+            if (sortVal === 'points-asc') return ptsA - ptsB;
+            return 0;
+        });
+
+        rows.forEach(row => {
+            const drawerId = row.getAttribute('onclick') ? row.getAttribute('onclick').replace("toggleRow('", "").replace("')", "") : null;
+            const drawer = drawerId ? document.getElementById(drawerId) : null;
+            tbody.appendChild(row);
+            if (drawer) tbody.appendChild(drawer);
+        });
+    }
+
+    function copyText(text) {
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            showToast("Copied evidence to clipboard!");
+        }).catch(err => {
+            showToast("Failed to copy");
+        });
+    }
+
+    function copyFullReportEvidence() {
+        const score = "{{ data.risk_result.total_score }}";
+        const band = "{{ data.risk_result.risk_band }}";
+        const file = "{{ record.filename }}";
+        const from = "{{ data.parsed_email.from_address }}";
+        const subject = "{{ data.parsed_email.subject }}";
+
+        const text = `Forenix Forensic Evidence Report\nFile: ${file}\nScore: ${score}/100 (${band})\nFrom: ${from}\nSubject: ${subject}\nReport ID: #{{ record.id }}`;
+        copyText(text);
+    }
+
+    function showToast(msg) {
+        const toast = document.getElementById('toast-notification');
+        const toastMsg = document.getElementById('toast-message');
+        if (!toast || !toastMsg) return;
+
+        toastMsg.innerText = msg;
+        toast.classList.remove('translate-y-10', 'opacity-0', 'pointer-events-none');
+        toast.classList.add('translate-y-0', 'opacity-100');
+
+        setTimeout(() => {
+            toast.classList.remove('translate-y-0', 'opacity-100');
+            toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
+        }, 2500);
+    }
+
+    // Initialize Feather icons
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.feather) feather.replace();
+    });
+</script>
+{% endblock %}

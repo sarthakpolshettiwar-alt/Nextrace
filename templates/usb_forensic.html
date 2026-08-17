@@ -1,5 +1,5 @@
 {% extends "app_base.html" %}
-{% block title %}USB Forensic - NexTrace{% endblock %}
+{% block title %}USB Forensic - Forenix{% endblock %}
 
 {% block content %}
 <div class="mb-8 flex items-center justify-between">
@@ -284,7 +284,7 @@
                         <option value="ALL">All Statuses</option>
                         <option value="Completed">Completed</option>
                         <option value="Active">Active / Connected</option>
-                        <option value="Unexpected Removal">Unexpected Removal</option>
+                        <option value="Unexpected Removal">Disconnected</option>
                         <option value="Missing Disconnect Event">Missing Disconnect Event</option>
                     </select>
                 </div>
@@ -367,8 +367,9 @@
                             {% elif sess.status == 'Active' %}bg-blue-100 text-blue-800 border border-blue-200
                             {% elif sess.status == 'Unexpected Removal' %}bg-red-100 text-red-800 border border-red-200
                             {% else %}bg-amber-100 text-amber-800 border border-amber-200{% endif %}">
-                            {{ sess.status }}
+                            {% if sess.status == 'Unexpected Removal' %}Disconnected{% else %}{{ sess.status }}{% endif %}
                         </span>
+
                         <button type="button" class="text-gray-400 hover:text-gray-600 transition-colors p-1 shrink-0">
                             <i data-feather="chevron-down" id="chevron-{{ loop.index }}" class="w-5 h-5 transition-transform duration-200"></i>
                         </button>

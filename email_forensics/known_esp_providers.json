@@ -1,0 +1,25 @@
+{
+  "description": "Checked against 20 known ESP infrastructure domains — presence on this list does not guarantee legitimacy, only that the domain is a widely-used commercial email platform.",
+  "known_esp_domains": [
+    "amazonses.com",
+    "awstrack.me",
+    "sendgrid.net",
+    "sendgrid.com",
+    "mailchimp.com",
+    "mandrillapp.com",
+    "sparkpostmail.com",
+    "constantcontact.com",
+    "hubspot.com",
+    "list-manage.com",
+    "salesforce.com",
+    "marketo.com",
+    "mailgun.org",
+    "mailgun.net",
+    "customeriomail.com",
+    "mktomail.com",
+    "postmarkapp.com",
+    "ctctsent.com",
+    "rsys5.com",
+    "cvent-planner.com"
+  ]
+}

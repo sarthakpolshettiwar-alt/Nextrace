@@ -51,3 +51,18 @@ CREATE TABLE IF NOT EXISTS TrustedDevices (
     FOREIGN KEY(user_id) REFERENCES User(id)
 );
 
+CREATE TABLE IF NOT EXISTS email_analyses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    upload_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    risk_score INTEGER NOT NULL,
+    risk_band TEXT NOT NULL,
+    hard_flagged BOOLEAN NOT NULL DEFAULT 0,
+    full_result_json TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES User(id)
+);
+
+
+
+

@@ -9,3 +9,13 @@ Werkzeug==3.0.0
 evtx==0.12.1
 reportlab==4.1.0
 Flask-Limiter==3.5.0
+extract-msg>=0.56.0
+pyspf>=2.0.14
+dkimpy>=1.1.8
+checkdmarc>=5.17.0
+dnspython>=2.6.0
+tldextract>=5.0.0
+rapidfuzz>=3.0.0
+
+
+

@@ -1,0 +1,51 @@
+{
+  "urgency": [
+    "act now",
+    "immediately",
+    "your account will be suspended",
+    "urgent action required",
+    "24 hours to respond",
+    "account termination",
+    "immediate attention required",
+    "unauthorized login attempt",
+    "suspension notice"
+  ],
+  "credential_theft": [
+    "verify your password",
+    "confirm your identity",
+    "update your account details",
+    "login to restore access",
+    "click here to verify",
+    "security check required",
+    "reset your credentials",
+    "re-verify account"
+  ],
+  "financial": [
+    "wire transfer",
+    "gift card",
+    "invoice payment overdue",
+    "unclaimed funds",
+    "payment confirmation required",
+    "direct deposit update",
+    "cryptocurrency payment",
+    "overdue invoice",
+    "payment routing"
+  ],
+  "lottery_prize": [
+    "you have won",
+    "congratulations winner",
+    "claim your prize",
+    "lottery payout",
+    "jackpot winner",
+    "reward points claim",
+    "exclusive reward"
+  ],
+  "banking": [
+    "bank account frozen",
+    "credit card suspended",
+    "fraud alert notification",
+    "atm card blocked",
+    "security department alert",
+    "unusual banking activity"
+  ]
+}

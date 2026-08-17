@@ -1,0 +1,20 @@
+{
+  "description": "Curated list of high-risk executable, script, and macro-enabling attachment extensions",
+  "dangerous_extensions": [
+    ".exe",
+    ".scr",
+    ".bat",
+    ".cmd",
+    ".com",
+    ".pif",
+    ".vbs",
+    ".vbe",
+    ".js",
+    ".jse",
+    ".wsf",
+    ".msi",
+    ".jar",
+    ".ps1",
+    ".lnk"
+  ]
+}

@@ -221,7 +221,9 @@ def get_otp_requests_count_last_hour(email):
     conn.close()
     return count
 
+
 def get_paginated_activity_log(page=1, per_page=25, search_email=None):
+
     conn = get_db_connection()
     offset = (page - 1) * per_page
     query = 'SELECT * FROM Login_Attempts'
@@ -300,7 +302,60 @@ def delete_user_account(user_id, email):
     conn.execute('DELETE FROM TrustedDevices WHERE user_id = ?', (user_id,))
     conn.execute('DELETE FROM Login_Attempts WHERE email = ?', (email,))
     conn.execute('DELETE FROM PasswordReset WHERE email = ?', (email,))
+    conn.execute('DELETE FROM email_analyses WHERE user_id = ?', (user_id,))
     conn.execute('DELETE FROM User WHERE id = ?', (user_id,))
     conn.commit()
     conn.close()
+
+
+# --- Email Forensic Analysis Helpers ---
+
+def insert_email_analysis(user_id: int, filename: str, risk_score: int, risk_band: str, hard_flagged: bool, full_result_json: str, db_path: Optional[str] = None) -> int:
+    """Inserts a new email analysis record and returns the inserted row ID."""
+    if db_path is None:
+        db_path = DB_NAME
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS email_analyses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            filename TEXT NOT NULL,
+            upload_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            risk_score INTEGER NOT NULL,
+            risk_band TEXT NOT NULL,
+            hard_flagged BOOLEAN NOT NULL DEFAULT 0,
+            full_result_json TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES User(id)
+        )
+    """)
+    cursor.execute("""
+        INSERT INTO email_analyses (user_id, filename, risk_score, risk_band, hard_flagged, full_result_json)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (user_id, filename, risk_score, risk_band, 1 if hard_flagged else 0, full_result_json))
+    analysis_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return analysis_id
+
+
+def get_email_analysis_by_id(analysis_id: int, user_id: Optional[int] = None) -> Optional[dict]:
+    """Retrieves a specific email analysis record by ID."""
+    conn = get_db_connection()
+    if user_id is not None:
+        row = conn.execute('SELECT * FROM email_analyses WHERE id = ? AND user_id = ?', (analysis_id, user_id)).fetchone()
+    else:
+        row = conn.execute('SELECT * FROM email_analyses WHERE id = ?', (analysis_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_email_analyses_by_user(user_id: int) -> List[dict]:
+    """Retrieves all past email analysis records for a user."""
+    conn = get_db_connection()
+    rows = conn.execute('SELECT * FROM email_analyses WHERE user_id = ? ORDER BY upload_timestamp DESC', (user_id,)).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
 

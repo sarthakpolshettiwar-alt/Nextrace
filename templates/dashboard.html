@@ -1,9 +1,9 @@
 {% extends "app_base.html" %}
-{% block title %}Dashboard - NexTrace{% endblock %}
+{% block title %}Dashboard - Forenix{% endblock %}
 
 {% block content %}
 <div class="mb-8">
-    <h1 class="text-3xl font-bold text-gray-900 mb-2">Welcome to NexTrace</h1>
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">Welcome to Forenix</h1>
     <p class="text-gray-500">Select an investigation module below to get started.</p>
 </div>
 
@@ -19,13 +19,14 @@
     </a>
 
     <!-- Email Forensic Module -->
-    <a href="{{ url_for('email_forensic') }}" class="group bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-brand/50 transition-all cursor-pointer block">
+    <a href="{{ url_for('email_forensics.upload') }}" class="group bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-brand/50 transition-all cursor-pointer block">
         <div class="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center text-brand mb-4 group-hover:scale-110 transition-transform">
             <i data-feather="mail" class="w-6 h-6"></i>
         </div>
         <h2 class="text-lg font-bold text-gray-900 mb-2 group-hover:text-brand transition-colors">Email Forensic Analysis</h2>
         <p class="text-sm text-gray-500 line-clamp-2">Analyze email headers, detect spoofing, and identify potential phishing attempts.</p>
     </a>
+
 
     <!-- Deepfake Detection Module (Disabled) -->
     <div class="bg-gray-50 rounded-2xl border border-gray-200 p-6 opacity-75 relative overflow-hidden cursor-not-allowed">

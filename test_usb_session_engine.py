@@ -128,7 +128,8 @@ class TestUsbSessionEngine(unittest.TestCase):
             disconnected_timestamp=None,
             duration_seconds=0,
             duration_formatted="Active",
-            status="Unexpected Removal"
+            status="Disconnected"
+
         )
         
         dev1 = UsbDevice("SanDisk", "Cruzer", "1.0", "4C530001330910119280", "SanDisk Cruzer", None, None)

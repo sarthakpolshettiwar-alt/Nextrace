@@ -2,7 +2,7 @@
 updated: 2026-08-04T11:58:00+05:30
 ---
 
-# Project State — Nextrace
+# Project State — Forenix
 
 ## Current Position
 

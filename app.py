@@ -116,13 +116,20 @@ oauth.register(
 # Pass oauth to app context for blueprint
 app.oauth = oauth
 
+from email_forensics import email_bp
+
 # Register Blueprints
 app.register_blueprint(auth_bp)
 app.register_blueprint(settings_bp)
+app.register_blueprint(email_bp)
+
+# Apply Rate Limiter to Module 2 upload endpoint
+limiter.limit("10 per hour", methods=['POST'])(app.view_functions['email_forensics.analyze'])
 
 # Setup Database
 with app.app_context():
     setup_database()
+
 
 # Dashboard Route
 @app.route('/')

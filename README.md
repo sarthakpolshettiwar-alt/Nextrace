@@ -1,144 +1,211 @@
-# NexTrace — Digital Forensics Investigation Platform
+# Forenix — Digital Forensics Investigation Platform
 
-NexTrace is a modular digital forensics platform built to help investigators analyze digital evidence from Windows systems in a structured, auditable way. The platform is designed around independent forensic modules, with **USB Device Forensic Analysis** as the first fully functional module.
+## Overview
 
-## What It Does
+**Forenix** is a modular digital forensics platform engineered to assist forensic investigators, incident responders, and security analysts in processing, correlating, and evaluating digital evidence across desktop and system environments.
 
-USB devices are one of the most common vectors for data theft and unauthorized data transfer, since they leave no network trace. NexTrace's USB Forensic module automates the process of extracting, correlating, and reporting on USB connection history from a Windows machine, turning a manual, multi-hour registry investigation into a guided, few-click workflow.
+Built with an architecture centered around independent, domain-specific forensic modules, Forenix establishes a unified evidence analysis environment powered by a core set of non-negotiable engineering and design principles:
+- **Zero Fabricated Data**: Forenix never outputs synthetic confidence metrics, mock risk scores, or speculative AI assertions. All displayed metrics originate directly from raw, verifiable forensic artifacts.
+- **Honest Disclosure of Limitations**: Forensic boundary limits—such as Windows Registry `Last Write Time` mechanics—are surfaced transparently directly in the user interface rather than obfuscated.
+- **Rule-Based Explainable Logic**: Deterministic, auditable rule sets are prioritized over black-box machine learning models wherever legal defensibility and evidence auditability matter.
+- **Consistent Platform Security**: Enterprise-grade security standards (RBAC, CSRF defense, rate limiting, magic-byte validation, security headers) apply uniformly across every module.
 
-## Features
+---
 
-### USB Forensic Analysis
-- **Registry Hive Upload** — accepts a Windows `SYSTEM` registry hive file for analysis
-- **USB Device Detection** — extracts device name, vendor, product, serial number, and connection timestamps using RegRipper
-- **Connection Timeline** — chronological view of when each device was connected
-- **Windows Event Log Correlation** — optionally upload a `.evtx` event log; matches Event IDs (2003, 2100 series) to registry-detected devices to confirm actual usage timestamps
-- **Risk & Anomaly Flagging** — rule-based detection of unusual activity (e.g. connections outside standard business hours)
-- **Multi-Machine Device Matching** — cross-references device serial numbers across multiple analyzed hives to detect the same USB device appearing on different machines
-- **PDF Report Generation** — compiles all findings into a downloadable forensic report
+## Module 1: USB Device Forensic Analysis (Status: Complete)
 
-### Authentication & Security
-- Email/password login with hashed passwords (never stored in plain text)
-- Google OAuth sign-in
-- OTP-based password reset via email (SendGrid)
-- Account lockout after repeated failed login attempts
-- Session timeout after inactivity
-- CSRF protection on all forms
-- "Trust this device" option for reduced login friction
-- Full login activity log for auditability
+### Problem Addressed
+USB storage devices represent one of the primary vectors for physical data exfiltration, malware insertion, and unauthorized device connection in corporate and enterprise environments. Because standard USB connections do not leave network traffic traces, investigators must extract, parse, and correlate system registry keys and Windows Event Logs to establish timeline fidelity.
 
-### Coming Soon
-- Email Forensic Analysis (header parsing, SPF/DKIM/DMARC spoofing detection)
-- Deepfake Detection (video/image manipulation analysis)
+### Forensic Engine & Implementation Details
+- **Registry Extraction**: Automates the extraction of USB artifact records from Windows `SYSTEM` registry hives using **RegRipper** invoked via controlled Python `subprocess` execution.
+- **Regex & Data Parsing**: Parses raw RegRipper output using regex structures to extract vendor names, product IDs, serial numbers, friendly names, and registry `Last Write Time` timestamps.
+- **Windows Event Log Correlation**: Leverages `python-evtx` to parse native Windows Event Logs (`.evtx`) across both **Device Configuration** (`Microsoft-Windows-Kernel-PnP/Configuration`, Event ID 20001/20003) and **Device Management** (`Microsoft-Windows-UserPnp/DeviceInstall`, Event ID 20001) channels.
+- **Session Reconstruction & Cryptographic Integrity**: Correlates connect/disconnect event pairs into discrete device sessions. Every reconstructed session generates a unique **SHA-256 integrity hash** generated from device serial number, connect timestamp, and disconnect timestamp for evidence auditability.
+- **Rule-Based Risk Analysis**: Evaluates USB connection timelines for operational anomalies, including connection during unusual hours (e.g. late-night activity between 11 PM and 5 AM) and rapid reconnection patterns.
+- **Forensic PDF Reporting**: Generates client-ready, multi-page forensic reports utilizing **ReportLab**, featuring executive summaries, device inventories, session breakdowns, and anomaly flags.
+- **Database Persistence**: Stores analysis sessions in **SQLite** with built-in hash deduplication to eliminate redundant parsing of historical evidence.
+
+---
+
+## Module 2: Email Forensic Analysis (Status: Planned)
+
+### Problem Addressed
+Email spoofing, BEC (Business Email Compromise), and sophisticated phishing attacks exploit weaknesses in email header verification, visual domain confusion, and malicious attachments. Forensic analysts require a structured environment to parse, validate, and score raw email files (`.eml` / `.msg`).
+
+### Planned Features & Architecture
+*Note: Module 2 is currently in the planning and architecture phase.*
+- **Multi-Format Parsing**: Planned integration of Python's native `email` module for RFC 822 (`.eml`) parsing and `extract-msg` for Microsoft Outlook (`.msg`) file extraction into a normalized internal data structure (`ParsedEmail`).
+- **Cryptographic Authentication Verification**: Planned execution of live DNS lookups to validate **SPF** (via `pyspf`), **DKIM** (via `dkimpy`), and **DMARC** (via `checkdmarc` / `dnspython`).
+- **Spoofing & Impersonation Logic**: Planned detection of envelope sender vs. `From` address mismatches, return-path mismatches, and display name spoofing.
+- **URL & Domain Mismatch Analysis**: Extraction and parsing of HTML/plaintext links using `tldextract` to catch domain mismatches (e.g., link text claiming `paypal.com` but pointing to an attacker domain), typosquatting (via `rapidfuzz`), homograph/punycode tricks (via `idna`), and raw IP destinations.
+
+---
+
+## Module 3: Deepfake Detection (Status: Planned)
+
+### Problem Addressed
+The rapid escalation of generative synthetic media creates severe risks of video tampering, identity impersonation, and digital evidence fabrication.
+
+### Planned Features & Architecture
+*Note: Module 3 is currently in the planning and architecture phase.*
+- **Frame Extraction**: Planned frame-by-frame decomposition of uploaded video files using **OpenCV**.
+- **Face & Region Detection**: Planned facial alignment and landmark tracking across frame sequences utilizing **MediaPipe**.
+- **Pretrained Neural Network Inference**: Planned classification using established, battle-tested pretrained models via **PyTorch** or **TensorFlow** (e.g. EfficientNet / MesoNet backbones fine-tuned on deepfake benchmarks).
+- **Design Constraint Decision**: *Training a deepfake classifier from scratch was explicitly ruled out due to massive compute requirements, dataset curation overhead, and poor generalization performance compared to verified pretrained weights.*
+
+---
+
+## Authentication & Security (Platform-wide)
+
+Security is built directly into the foundation of Forenix and applies across all modules:
+- **Password Hashing**: Secure password hashing implemented via Werkzeug (`scrypt` / `pbkdf2:sha256`).
+- **OAuth 2.0 Integration**: Third-party authentication via Google OAuth 2.0 powered by `Authlib`.
+- **OTP Password Reset**: Two-factor password reset workflow utilizing 6-digit OTP codes delivered via SendGrid.
+- **Session Management**: Session timeout enforcement, secure HTTP-only and SameSite cookie flags, and account lockout protection after repeated failed login attempts.
+- **Rate Limiting**: Endpoint abuse protection enforced via `Flask-Limiter` (e.g. IP/user rate caps on authentication routes).
+- **Security Headers**: Strict response header hardening including `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `X-XSS-Protection: 1; mode=block`, and Content Security Policy directives.
+- **File Upload Validation**: Magic-byte signature checking for all uploaded evidence files to prevent extension-spoofing attacks, paired with automatic temporary file cleanup.
+
+---
 
 ## Tech Stack
 
-- **Backend:** Python, Flask
-- **Registry Analysis:** RegRipper (third-party forensic tool)
-- **Event Log Parsing:** python-evtx
-- **Database:** SQLite
-- **Authentication:** Flask sessions, Authlib (Google OAuth), Flask-WTF (CSRF)
-- **Email Delivery:** SendGrid API
-- **Report Generation:** ReportLab
-- **Frontend:** HTML, CSS, JavaScript, Tailwind CSS
+### Current Stack (Core Platform & Module 1)
+- **Language**: Python 3.10+
+- **Web Framework**: Flask
+- **Registry Extraction**: RegRipper (via `subprocess`)
+- **Event Log Parsing**: `python-evtx`
+- **Database**: SQLite3
+- **PDF Generation**: ReportLab
+- **Frontend Styling**: Vanilla CSS & Tailwind CSS CDN
+- **Authentication & Security**: Authlib (Google OAuth), SendGrid API, Werkzeug Security, Flask-WTF (CSRF Protection), Flask-Limiter
+
+### Planned Additions (Modules 2 & 3)
+- **Email Parsing & Auth**: `extract-msg`, `pyspf`, `dkimpy`, `checkdmarc`, `dnspython`, `tldextract`, `rapidfuzz`
+- **Media & Deepfake Analysis**: OpenCV (`opencv-python`), MediaPipe, PyTorch / TensorFlow
+
+---
+
+## Project Structure
+
+```text
+Forenix/
+├── app.py                      # Primary Flask application server & route definitions
+├── auth.py                     # Authentication blueprint (Login, Signup, OAuth, OTP, Logout)
+├── database.py                 # SQLite database initialization, schemas, and helper queries
+├── email_service.py            # SendGrid email integration for OTP delivery
+├── regripper_runner.py         # Subprocess runner for executing RegRipper plugins
+├── usbstor_parser.py           # USBSTOR registry output parsing and regex extraction
+├── settings.py                 # User settings, profile updates, and security preferences
+├── schema.sql                  # Relational database schema definition
+├── requirements.txt            # Python dependencies
+├── .env.example                # Template environment configuration file
+├── adapters/                   # Event log correlation adapters
+│   └── event_log_adapter.py    # EVTX parsing and timeline correlation engine
+├── tools/                      # Report generation utilities
+│   └── report_generator.py     # ReportLab PDF building logic
+├── templates/                  # Jinja2 HTML templates
+│   ├── app_base.html           # Main authenticated app layout (sidebar, navbar)
+│   ├── base.html               # Unauthenticated layout (auth pages)
+│   ├── dashboard.html          # Module hub dashboard
+│   ├── usb_forensic.html       # Module 1 USB Forensic interface
+│   ├── settings.html           # User settings view
+│   └── auth/                   # Authentication view templates
+├── static/                     # Static assets (CSS, JS, images)
+├── temp_samples/               # Forensic sample evidence files for testing
+└── uploads/                    # Temporary secure storage for uploaded hives/logs
+```
+
+---
 
 ## Setup Instructions
 
-### 1. Clone the repository
+### 1. Prerequisites & Environment Setup
+Clone the repository and create a Python virtual environment:
+
 ```bash
 git clone https://github.com/sarthakpolshettiwar-alt/Nextrace.git
 cd Nextrace
-```
-
-### 2. Create a virtual environment
-```bash
 python -m venv venv
-venv\Scripts\activate      # Windows
-source venv/bin/activate   # macOS/Linux
 ```
 
-### 3. Install dependencies
+Activate the virtual environment:
+- **Windows (PowerShell)**: `.\venv\Scripts\Activate.ps1`
+- **Linux/macOS**: `source venv/bin/activate`
+
+### 2. Install Dependencies
+Install all required Python packages:
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Set up RegRipper
-RegRipper is a third-party tool and is not bundled in this repository. Download it separately and place it at:
-```
-tools/regripper/
-```
-Ensure `rip.exe` and the `plugins/` folder are present in that directory.
+### 3. RegRipper Setup Note
+Ensure RegRipper (`rip.exe` or `rip.pl`) is installed on your system path or placed within the project root directory so `regripper_runner.py` can invoke RegRipper plugins (`usbstor`, `devclass`) during registry analysis.
 
-### 5. Configure environment variables
-Copy the example environment file and fill in your own credentials:
+### 4. Configure Environment Variables
+Copy the `.env.example` file to `.env` and fill in the required keys:
+
 ```bash
-copy .env.example .env      # Windows
-cp .env.example .env        # macOS/Linux
+cp .env.example .env
 ```
 
-Required variables in `.env`:
-```
-SENDGRID_API_KEY=
-SENDER_EMAIL=
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-SECRET_KEY=
+Edit `.env` with your configuration:
+```env
+SECRET_KEY=your_random_secret_key_here
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+SENDGRID_API_KEY=your_sendgrid_api_key
+SENDER_EMAIL=noreply@yourdomain.com
 ```
 
-### 6. Run the application
+### 5. Initialize Database & Run Application
+Run the Flask server:
+
 ```bash
 python app.py
 ```
-The app will be available at `http://127.0.0.1:5000`
+
+Open your browser and navigate to `http://localhost:5000`.
+
+---
 
 ## Getting a SYSTEM Hive File for Testing
 
-To test the USB Forensic module, you'll need a Windows `SYSTEM` registry hive:
+To test Module 1 on a live Windows host, extract the active `SYSTEM` registry hive using an elevated PowerShell prompt:
 
-1. Open PowerShell as Administrator
-2. Run:
-   ```
-   reg save HKLM\SYSTEM C:\Users\%USERNAME%\system_test.hive
-   ```
-3. Upload the resulting file through the USB Forensic module's upload interface
-
-*Note: This only reads a copy of the registry and does not modify your system.*
-
-## Project Structure
-
-```
-Nextrace/
-├── app.py                  # Main Flask application
-├── auth.py                 # Authentication blueprint (login, signup, OAuth, OTP)
-├── create_admin.py         # Script to create an initial admin user
-├── database.py             # Database connection and queries
-├── schema.sql              # SQLite schema
-├── regripper_runner.py     # Subprocess wrapper for RegRipper
-├── usbstor_parser.py       # Parses RegRipper's USB output into structured data
-├── email_service.py        # SendGrid email integration (OTP delivery)
-├── tools/
-│   ├── event_parser.py     # Windows Event Log (.evtx) correlation
-│   ├── report_generator.py # PDF report generation
-│   └── regripper/          # RegRipper binary + plugins (not included, see setup)
-├── templates/               # HTML templates
-└── requirements.txt
+```powershell
+# Open PowerShell as Administrator
+reg save HKLM\SYSTEM system_test.hive /y
 ```
 
-## Forensic Integrity Principles
+Upload the resulting `system_test.hive` file on the **USB Forensic Analysis** page (`/usb-forensic`) to analyze USB connection history.
 
-This project follows core digital forensics practices:
-- Operates only on **copies** of registry hives, never live system files
-- No fabricated or placeholder statistics — all displayed data comes from actual parsed results
-- Every login/system action is logged for auditability
+---
 
-## Screenshots
+## Design Principles
 
-*(Add screenshots of the dashboard, USB module, and reports here)*
+1. **No Fabricated or Placeholder Data**: Forenix explicitly rejects fake confidence scores, synthetic risk percentages, or arbitrary AI output. During early development, a proposed "confidence score" feature was evaluated and deliberately removed because it introduced non-deterministic, unprovable data. Every figure in Forenix is tied directly to raw forensic artifacts.
+2. **Honest UI Disclosure of Limitations**: Windows Registry `Last Write Time` records update when ANY USB device under a key is modified. Forenix directly discloses this limitation in the UI banner and reports, prompting analysts to upload Event Logs for microsecond-accurate connect/disconnect timeline correlation.
+3. **Deterministic & Explainable Logic Over Black-Box ML**: In digital forensics, evidence must stand up in court. Deterministic rules, regex parsers, and direct artifact extractions are used wherever auditability is mandatory.
+
+---
+
+## Roadmap
+
+- [x] **Module 1: USB Device Forensic Analysis** (Registry parsing, EVTX event log correlation, SHA-256 session integrity, ReportLab PDF export).
+- [ ] **Module 2: Email Forensic Analysis** (Header parsing, SPF/DKIM/DMARC validation, spoofing detection, domain & link risk scoring).
+- [ ] **Module 3: Deepfake Detection** (OpenCV frame extraction, MediaPipe face tracking, pretrained neural network inference).
+
+---
 
 ## License
 
-*(To be added)*
+*Placeholder — License to be added.*
+
+---
 
 ## Disclaimer
 
-This tool is intended for educational and authorized forensic investigation purposes only. Always ensure you have proper authorization before analyzing any system or device.
+Forenix is designed strictly for educational, research, authorized incident response, and legal digital forensics investigations. Unauthorized analysis of computer systems, registry hives, or email records without explicit authorization is strictly prohibited.

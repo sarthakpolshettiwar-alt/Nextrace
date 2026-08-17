@@ -17,7 +17,7 @@ def send_otp_email(to_email: str, otp_code: str) -> bool:
         
     sg = sendgrid.SendGridAPIClient(api_key=api_key)
     
-    subject = "Your NexTrace Password Reset Code"
+    subject = "Your Forenix Password Reset Code"
     body_text = f"""
 Hello,
 
@@ -29,7 +29,7 @@ This code expires in 10 minutes. Please do not share it with anyone.
 If you did not request this reset, you can safely ignore this email.
 
 Thanks,
-NexTrace Team
+Forenix Team
 """
     
     from_email = Email(sender_email)
